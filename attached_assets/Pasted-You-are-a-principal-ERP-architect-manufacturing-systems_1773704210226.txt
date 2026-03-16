@@ -1,0 +1,398 @@
+You are a principal ERP architect, manufacturing systems expert, and full-stack engineer.
+
+Your task is to DESIGN and BUILD a modern, scalable, and highly flexible ERP system for small-to-medium manufacturing and distribution companies.
+
+This system must combine:
+- NetSuite-level scalability and planning intelligence
+- Acumatica-level flexibility, transparency, and extensibility
+
+You are not building a demo. You are building a real ERP foundation.
+
+==================================================
+1. CORE OBJECTIVE
+==================================================
+
+Build a web-based ERP system that supports:
+
+- Discrete manufacturing (MTS, MTO, ETO)
+- Distribution and warehouse operations
+- Purchasing and supply chain
+- CRM and order management
+- Inventory and production control
+- MRP and what-if planning
+- Quality and compliance
+- Financial integration hooks
+- Highly customizable dashboards
+- Universal global search (NetSuite-like)
+- Smart Transfer (flagship data migration/integration feature)
+
+The system must be modular, scalable, and production-ready.
+
+==================================================
+2. BACKEND ARCHITECTURE (MANDATORY DESIGN)
+==================================================
+
+Use a HYBRID architecture:
+
+----------------------------------
+A. NETSUITE-INSPIRED (SCALABILITY)
+----------------------------------
+Implement:
+- Service-oriented backend modules
+- Async job queues (BullMQ + Redis)
+- Background workers for:
+  - MRP runs
+  - what-if planning
+  - costing
+  - imports
+  - notifications
+- Event-driven workflows
+- Indexed global search service
+- API-first architecture
+- Multi-site and future multi-tenant support
+- Batch-safe processing
+
+----------------------------------
+B. ACUMATICA-INSPIRED (FLEXIBILITY)
+----------------------------------
+Implement:
+- PostgreSQL relational database (system of record)
+- Prisma ORM
+- Explicit business entities (ERP-native tables)
+- Inventory ledger (not just quantities)
+- Revision-controlled:
+  - items
+  - BOMs
+  - routings
+- Strong transaction control with rollback
+- Configurable workflows and approvals
+- Extension-friendly schema
+
+----------------------------------
+TECH STACK
+----------------------------------
+Frontend:
+- React + TypeScript
+- Tailwind CSS
+- TanStack Query
+- React Router
+
+Backend:
+- Node.js + TypeScript
+- NestJS or Express (modular)
+- Prisma ORM
+
+Infra:
+- PostgreSQL
+- Redis (queues + cache)
+- BullMQ (jobs)
+- File storage abstraction (S3-ready)
+
+Search:
+- PostgreSQL full-text + trigram
+- Abstract for future Elasticsearch/OpenSearch
+
+==================================================
+3. FLAGSHIP FEATURE: SMART TRANSFER
+==================================================
+
+Smart Transfer is a core differentiator.
+
+It must:
+- Connect to:
+  - PostgreSQL
+  - MySQL
+  - SQL Server
+  - Oracle
+  - CSV / Excel / JSON
+- Auto-scan source schema
+- Suggest mappings to ERP entities:
+  - customers
+  - vendors
+  - items
+  - BOMs
+  - routings
+  - inventory
+  - orders
+- Allow manual override mapping
+- Provide reusable mapping templates
+- Perform:
+  - key normalization
+  - data transformation
+  - validation
+- Support:
+  - dry-run simulation
+  - error queue
+  - batch import
+  - rollback checkpoints
+- Maintain:
+  - audit logs
+  - reconciliation reports
+- Support incremental sync
+
+Architecture:
+- connector adapters
+- staging tables
+- mapping engine
+- validation engine
+- job queue processor
+
+==================================================
+4. CORE ERP MODULES
+==================================================
+
+Build FULL modules (not placeholders):
+
+- System Administration (users, roles, permissions)
+- CRM (customers, contacts, activities)
+- Quoting
+- Sales Orders
+- Item Master
+- BOM Management (multi-level, revisioned)
+- Routing / Work Centers
+- Engineering Change Control (ECO/ECR)
+- Inventory Control (ledger-based)
+- Purchasing (PO, receiving)
+- Production / Work Orders
+- Scheduling / Planning
+- MRP Engine
+- What-if Planning Engine
+- Shop Floor Control
+- Shipping / Fulfillment
+- Invoicing (accounting hooks)
+- Quality Management
+- Compliance Management
+- Reporting / Analytics
+- Dashboard Framework
+- Global Search Engine
+
+==================================================
+5. MRP ENGINE (REQUIRED)
+==================================================
+
+Design a real MRP system:
+
+Inputs:
+- sales orders
+- forecasts
+- safety stock
+- reorder policies
+
+Supply:
+- inventory
+- POs
+- WOs
+
+Outputs:
+- planned POs
+- planned WOs
+- reschedule messages
+- shortages
+
+Features:
+- full regen + net change
+- pegging relationships (basic)
+- planner workbench
+
+==================================================
+6. WHAT-IF PLANNING
+==================================================
+
+Allow scenario modeling:
+
+- clone baseline plan
+- modify:
+  - demand
+  - lead times
+  - capacity
+- compare:
+  - shortages
+  - inventory
+  - late orders
+- save scenarios
+- optional publish to real plan
+
+==================================================
+7. QUALITY & COMPLIANCE
+==================================================
+
+Quality:
+- incoming inspection
+- in-process inspection
+- final inspection
+- nonconformance tracking
+- defect codes
+- CAPA-lite
+- lot/serial traceability
+
+Compliance:
+- document control
+- revision tracking
+- audit logs
+- electronic approvals
+- retention rules
+
+==================================================
+8. UNIVERSAL GLOBAL SEARCH
+==================================================
+
+Must behave like NetSuite:
+
+- top bar on every page
+- autocomplete
+- keyboard navigation
+- fuzzy search
+- entity-aware results:
+  - items
+  - orders
+  - customers
+  - WOs
+  - POs
+- show metadata in results
+- permission-aware
+- recent searches
+- quick syntax:
+  - so:123
+  - item:ABC
+
+==================================================
+9. CUSTOM DASHBOARD
+==================================================
+
+- drag-and-drop widgets
+- resize/reorder
+- role defaults + user overrides
+- widgets:
+  - KPIs
+  - alerts
+  - lists
+  - charts
+
+==================================================
+10. CANNED STARTER MODELS
+==================================================
+
+Provide templates:
+
+1. Discrete Manufacturing
+2. Light Assembly / Kitting
+3. Make-to-Order / ETO
+4. Field Service / Repair
+5. Distribution + Light Manufacturing
+6. Professional Services
+
+Each includes:
+- seed data
+- workflows
+- dashboards
+- reports
+
+==================================================
+11. DATA MODEL REQUIREMENTS
+==================================================
+
+Design full schema for:
+
+- customers, vendors
+- items, revisions
+- BOMs, routings
+- sales orders, quotes
+- purchase orders
+- work orders
+- inventory ledger
+- shipments, invoices
+- ECO
+- quality records
+- audit logs
+- dashboards
+
+All must include:
+- status
+- audit fields
+- relationships
+- indexes
+
+==================================================
+12. TRANSACTION RULES
+==================================================
+
+Define logic for:
+- SO → WO
+- PO → receipt → inventory
+- WO issue → WIP → completion
+- shipment → invoice
+
+All must:
+- update ledger
+- log audit trail
+- enforce validation
+
+==================================================
+13. IMPLEMENTATION PLAN
+==================================================
+
+Build in phases:
+
+Phase 0: foundation (auth, DB, layout)
+Phase 1: dashboard + search
+Phase 2: master data
+Phase 3: engineering (BOM/routing)
+Phase 4: sales + purchasing
+Phase 5: inventory
+Phase 6: production
+Phase 7: MRP + what-if
+Phase 8: quality + compliance
+Phase 9: Smart Transfer
+Phase 10: reporting + polish
+
+==================================================
+14. CODING STANDARDS
+==================================================
+
+- TypeScript everywhere
+- modular services
+- clean separation of concerns
+- validation schemas
+- transaction-safe logic
+- reusable UI components
+
+==================================================
+15. WHAT TO DO FIRST
+==================================================
+
+Output in this order:
+
+1. Executive system overview
+2. Architecture diagram (textual)
+3. Module breakdown
+4. Database schema (Prisma)
+5. API structure
+6. Frontend structure
+7. MRP design
+8. Smart Transfer design
+9. Dashboard system design
+10. Global search design
+11. Begin code scaffolding
+
+==================================================
+FINAL INSTRUCTION
+==================================================
+
+Act as the lead architect and builder.
+
+Do not stay high-level.
+
+Produce:
+- real schema
+- real APIs
+- real UI structure
+- real system logic
+
+Prioritize:
+- manufacturing realism
+- traceability
+- scalability
+- usability
+- extensibility
+
+Begin immediately.

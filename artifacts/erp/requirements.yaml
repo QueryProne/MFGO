@@ -1,0 +1,20 @@
+packages:
+  "recharts": "For enterprise dashboard charts and metrics visualization"
+  "date-fns": "For human-readable date formatting across all tables and details"
+  "@hookform/resolvers": "Zod validation for complex ERP forms"
+  "framer-motion": "For subtle page transitions and widget entry animations"
+  "clsx": "Utility for constructing className strings"
+  "tailwind-merge": "Utility for merging tailwind classes"
+
+images:
+  - path: "artifacts/erp/public/images/auth-bg.png"
+    description: "Abstract dark mode geometric mesh with subtle blue and purple industrial/manufacturing overtones, very dark and sleek"
+    aspect_ratio: "16:9"
+  - path: "artifacts/erp/public/images/logo.png"
+    description: "Minimalist modern logo mark for ManufactureOS, a blue and white geometric 'M' shape, dark background"
+    aspect_ratio: "1:1"
+
+notes:
+  - App is designed dark-mode first for a professional enterprise aesthetic
+  - Uses the @workspace/api-client-react generated hooks for all data fetching
+  - Relies on standard Shadcn UI components available in the workspace

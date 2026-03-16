@@ -1,22 +1,71 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 1.0.0
+  description: ManufactureOS ERP API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: users
+    description: User management
+  - name: roles
+    description: Role management
+  - name: permissions
+    description: Permission management
+  - name: audit
+    description: Audit logs
+  - name: customers
+    description: CRM customers
+  - name: contacts
+    description: CRM contacts
+  - name: vendors
+    description: Vendor management
+  - name: items
+    description: Item master
+  - name: boms
+    description: Bill of Materials
+  - name: routings
+    description: Manufacturing routings
+  - name: workcenters
+    description: Work centers
+  - name: inventory
+    description: Inventory management
+  - name: quotes
+    description: Quoting
+  - name: salesorders
+    description: Sales orders
+  - name: purchaseorders
+    description: Purchase orders
+  - name: workorders
+    description: Work orders
+  - name: shipments
+    description: Shipments
+  - name: invoices
+    description: Invoices
+  - name: quality
+    description: Quality management
+  - name: mrp
+    description: MRP engine
+  - name: planning
+    description: What-if planning
+  - name: dashboard
+    description: Dashboard
+  - name: search
+    description: Global search
+  - name: smarttransfer
+    description: Smart Transfer
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,7 +73,1616 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # AUTH
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # USERS
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List users
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive, locked]
+      responses:
+        "200":
+          description: Users list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsersListResponse"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    put:
+      operationId: updateUser
+      tags: [users]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      operationId: deactivateUser
+      tags: [users]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: User deactivated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # ROLES
+  /roles:
+    get:
+      operationId: listRoles
+      tags: [roles]
+      summary: List roles
+      responses:
+        "200":
+          description: Roles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RolesListResponse"
+    post:
+      operationId: createRole
+      tags: [roles]
+      summary: Create role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoleRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+
+  /roles/{id}:
+    get:
+      operationId: getRole
+      tags: [roles]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+    put:
+      operationId: updateRole
+      tags: [roles]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRoleRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+
+  # AUDIT LOGS
+  /audit:
+    get:
+      operationId: listAuditLogs
+      tags: [audit]
+      summary: List audit logs
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: entity
+          in: query
+          schema:
+            type: string
+        - name: entityId
+          in: query
+          schema:
+            type: string
+        - name: userId
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: fromDate
+          in: query
+          schema:
+            type: string
+        - name: toDate
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogsListResponse"
+
+  # CUSTOMERS
+  /customers:
+    get:
+      operationId: listCustomers
+      tags: [customers]
+      summary: List customers
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Customers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomersListResponse"
+    post:
+      operationId: createCustomer
+      tags: [customers]
+      summary: Create customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCustomerRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+
+  /customers/{id}:
+    get:
+      operationId: getCustomer
+      tags: [customers]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+    put:
+      operationId: updateCustomer
+      tags: [customers]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCustomerRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+
+  # CONTACTS
+  /contacts:
+    get:
+      operationId: listContacts
+      tags: [contacts]
+      summary: List contacts
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: customerId
+          in: query
+          schema:
+            type: string
+        - name: vendorId
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Contacts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactsListResponse"
+    post:
+      operationId: createContact
+      tags: [contacts]
+      summary: Create contact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateContactRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+
+  # VENDORS
+  /vendors:
+    get:
+      operationId: listVendors
+      tags: [vendors]
+      summary: List vendors
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Vendors
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorsListResponse"
+    post:
+      operationId: createVendor
+      tags: [vendors]
+      summary: Create vendor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVendorRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+
+  /vendors/{id}:
+    get:
+      operationId: getVendor
+      tags: [vendors]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+    put:
+      operationId: updateVendor
+      tags: [vendors]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVendorRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+
+  # ITEMS
+  /items:
+    get:
+      operationId: listItems
+      tags: [items]
+      summary: List items
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemsListResponse"
+    post:
+      operationId: createItem
+      tags: [items]
+      summary: Create item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateItemRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Item"
+
+  /items/{id}:
+    get:
+      operationId: getItem
+      tags: [items]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Item"
+    put:
+      operationId: updateItem
+      tags: [items]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateItemRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Item"
+
+  # BOMs
+  /boms:
+    get:
+      operationId: listBoms
+      tags: [boms]
+      summary: List BOMs
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: itemId
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: BOMs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BomsListResponse"
+    post:
+      operationId: createBom
+      tags: [boms]
+      summary: Create BOM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBomRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bom"
+
+  /boms/{id}:
+    get:
+      operationId: getBom
+      tags: [boms]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: BOM
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bom"
+    put:
+      operationId: updateBom
+      tags: [boms]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBomRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bom"
+
+  # ROUTINGS
+  /routings:
+    get:
+      operationId: listRoutings
+      tags: [routings]
+      summary: List routings
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: itemId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Routings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoutingsListResponse"
+    post:
+      operationId: createRouting
+      tags: [routings]
+      summary: Create routing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRoutingRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Routing"
+
+  /routings/{id}:
+    get:
+      operationId: getRouting
+      tags: [routings]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Routing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Routing"
+
+  # WORK CENTERS
+  /workcenters:
+    get:
+      operationId: listWorkcenters
+      tags: [workcenters]
+      summary: List work centers
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Work centers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkcentersListResponse"
+    post:
+      operationId: createWorkcenter
+      tags: [workcenters]
+      summary: Create work center
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkcenterRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workcenter"
+
+  # INVENTORY
+  /inventory:
+    get:
+      operationId: listInventory
+      tags: [inventory]
+      summary: List inventory balances
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: itemId
+          in: query
+          schema:
+            type: string
+        - name: warehouseId
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Inventory balances
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryListResponse"
+
+  /inventory/transactions:
+    get:
+      operationId: listInventoryTransactions
+      tags: [inventory]
+      summary: List inventory transactions
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: itemId
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Transactions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryTransactionsListResponse"
+    post:
+      operationId: createInventoryTransaction
+      tags: [inventory]
+      summary: Post inventory transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInventoryTransactionRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryTransaction"
+
+  /inventory/warehouses:
+    get:
+      operationId: listWarehouses
+      tags: [inventory]
+      summary: List warehouses
+      responses:
+        "200":
+          description: Warehouses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WarehousesListResponse"
+    post:
+      operationId: createWarehouse
+      tags: [inventory]
+      summary: Create warehouse
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWarehouseRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Warehouse"
+
+  # QUOTES
+  /quotes:
+    get:
+      operationId: listQuotes
+      tags: [quotes]
+      summary: List quotes
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: customerId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Quotes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotesListResponse"
+    post:
+      operationId: createQuote
+      tags: [quotes]
+      summary: Create quote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateQuoteRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quote"
+
+  /quotes/{id}:
+    get:
+      operationId: getQuote
+      tags: [quotes]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quote"
+    put:
+      operationId: updateQuote
+      tags: [quotes]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateQuoteRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quote"
+
+  /quotes/{id}/convert:
+    post:
+      operationId: convertQuoteToSalesOrder
+      tags: [quotes]
+      summary: Convert quote to sales order
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "201":
+          description: Sales order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesOrder"
+
+  # SALES ORDERS
+  /salesorders:
+    get:
+      operationId: listSalesOrders
+      tags: [salesorders]
+      summary: List sales orders
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: customerId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Sales orders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesOrdersListResponse"
+    post:
+      operationId: createSalesOrder
+      tags: [salesorders]
+      summary: Create sales order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSalesOrderRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesOrder"
+
+  /salesorders/{id}:
+    get:
+      operationId: getSalesOrder
+      tags: [salesorders]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Sales order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesOrder"
+    put:
+      operationId: updateSalesOrder
+      tags: [salesorders]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSalesOrderRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesOrder"
+
+  # PURCHASE ORDERS
+  /purchaseorders:
+    get:
+      operationId: listPurchaseOrders
+      tags: [purchaseorders]
+      summary: List purchase orders
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: vendorId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Purchase orders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseOrdersListResponse"
+    post:
+      operationId: createPurchaseOrder
+      tags: [purchaseorders]
+      summary: Create purchase order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePurchaseOrderRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseOrder"
+
+  /purchaseorders/{id}:
+    get:
+      operationId: getPurchaseOrder
+      tags: [purchaseorders]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Purchase order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseOrder"
+    put:
+      operationId: updatePurchaseOrder
+      tags: [purchaseorders]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePurchaseOrderRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseOrder"
+
+  /purchaseorders/{id}/receive:
+    post:
+      operationId: receivePurchaseOrder
+      tags: [purchaseorders]
+      summary: Receive against purchase order
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReceivePORequest"
+      responses:
+        "200":
+          description: Receipt posted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # WORK ORDERS
+  /workorders:
+    get:
+      operationId: listWorkOrders
+      tags: [workorders]
+      summary: List work orders
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: itemId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Work orders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkOrdersListResponse"
+    post:
+      operationId: createWorkOrder
+      tags: [workorders]
+      summary: Create work order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkOrderRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkOrder"
+
+  /workorders/{id}:
+    get:
+      operationId: getWorkOrder
+      tags: [workorders]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Work order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkOrder"
+    put:
+      operationId: updateWorkOrder
+      tags: [workorders]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkOrderRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkOrder"
+
+  /workorders/{id}/complete:
+    post:
+      operationId: completeWorkOrder
+      tags: [workorders]
+      summary: Complete work order
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompleteWorkOrderRequest"
+      responses:
+        "200":
+          description: Work order completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  # SHIPMENTS
+  /shipments:
+    get:
+      operationId: listShipments
+      tags: [shipments]
+      summary: List shipments
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: salesOrderId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Shipments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShipmentsListResponse"
+    post:
+      operationId: createShipment
+      tags: [shipments]
+      summary: Create shipment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateShipmentRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shipment"
+
+  /shipments/{id}:
+    get:
+      operationId: getShipment
+      tags: [shipments]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Shipment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shipment"
+
+  # INVOICES
+  /invoices:
+    get:
+      operationId: listInvoices
+      tags: [invoices]
+      summary: List invoices
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: customerId
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invoices
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoicesListResponse"
+    post:
+      operationId: createInvoice
+      tags: [invoices]
+      summary: Create invoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInvoiceRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+
+  /invoices/{id}:
+    get:
+      operationId: getInvoice
+      tags: [invoices]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+
+  # QUALITY
+  /quality/inspections:
+    get:
+      operationId: listInspections
+      tags: [quality]
+      summary: List inspections
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Inspections
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InspectionsListResponse"
+    post:
+      operationId: createInspection
+      tags: [quality]
+      summary: Create inspection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInspectionRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Inspection"
+
+  /quality/nonconformances:
+    get:
+      operationId: listNonconformances
+      tags: [quality]
+      summary: List nonconformances
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Nonconformances
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NonconformancesListResponse"
+    post:
+      operationId: createNonconformance
+      tags: [quality]
+      summary: Create nonconformance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNonconformanceRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Nonconformance"
+
+  # MRP
+  /mrp/runs:
+    get:
+      operationId: listMrpRuns
+      tags: [mrp]
+      summary: List MRP runs
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: MRP runs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MrpRunsListResponse"
+    post:
+      operationId: runMrp
+      tags: [mrp]
+      summary: Trigger MRP run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunMrpRequest"
+      responses:
+        "201":
+          description: MRP run started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MrpRun"
+
+  /mrp/runs/{id}:
+    get:
+      operationId: getMrpRun
+      tags: [mrp]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: MRP run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MrpRun"
+
+  /mrp/recommendations:
+    get:
+      operationId: listMrpRecommendations
+      tags: [mrp]
+      summary: List MRP recommendations
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: runId
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Recommendations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MrpRecommendationsListResponse"
+
+  # PLANNING / WHAT-IF
+  /planning/scenarios:
+    get:
+      operationId: listPlanningScenarios
+      tags: [planning]
+      summary: List planning scenarios
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Scenarios
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanningScenariosListResponse"
+    post:
+      operationId: createPlanningScenario
+      tags: [planning]
+      summary: Create planning scenario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePlanningScenarioRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanningScenario"
+
+  /planning/scenarios/{id}:
+    get:
+      operationId: getPlanningScenario
+      tags: [planning]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Scenario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanningScenario"
+
+  # DASHBOARD
+  /dashboard/widgets:
+    get:
+      operationId: getDashboardWidgets
+      tags: [dashboard]
+      summary: Get dashboard widgets for current user
+      responses:
+        "200":
+          description: Dashboard widgets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardWidgetsResponse"
+    put:
+      operationId: saveDashboardWidgets
+      tags: [dashboard]
+      summary: Save dashboard layout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveDashboardWidgetsRequest"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardWidgetsResponse"
+
+  /dashboard/kpis:
+    get:
+      operationId: getDashboardKpis
+      tags: [dashboard]
+      summary: Get dashboard KPIs
+      responses:
+        "200":
+          description: KPIs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardKpisResponse"
+
+  # GLOBAL SEARCH
+  /search:
+    get:
+      operationId: globalSearch
+      tags: [search]
+      summary: Global search
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: entity
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+
+  # SMART TRANSFER
+  /smarttransfer/jobs:
+    get:
+      operationId: listSmartTransferJobs
+      tags: [smarttransfer]
+      summary: List Smart Transfer jobs
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Jobs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmartTransferJobsListResponse"
+    post:
+      operationId: createSmartTransferJob
+      tags: [smarttransfer]
+      summary: Create Smart Transfer job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSmartTransferJobRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmartTransferJob"
+
+  /smarttransfer/jobs/{id}:
+    get:
+      operationId: getSmartTransferJob
+      tags: [smarttransfer]
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmartTransferJob"
+
+  /smarttransfer/jobs/{id}/run:
+    post:
+      operationId: runSmartTransferJob
+      tags: [smarttransfer]
+      summary: Run Smart Transfer job
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunSmartTransferJobRequest"
+      responses:
+        "200":
+          description: Job started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /smarttransfer/mappings:
+    get:
+      operationId: listSmartTransferMappings
+      tags: [smarttransfer]
+      summary: List saved mapping templates
+      responses:
+        "200":
+          description: Mappings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmartTransferMappingsListResponse"
+
 components:
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 25
+
+  responses:
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +1692,2716 @@ components:
       required:
         - status
 
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - error
+        - message
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+      required:
+        - page
+        - limit
+        - total
+        - totalPages
+
+    # USER / AUTH
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        displayName:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, locked]
+        roleId:
+          type: string
+        roleName:
+          type: string
+        department:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - email
+        - status
+
+    CreateUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        roleId:
+          type: string
+        department:
+          type: string
+      required:
+        - email
+        - firstName
+        - lastName
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        roleId:
+          type: string
+        department:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, locked]
+
+    UsersListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    # ROLES
+    Role:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+
+    CreateRoleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+      required:
+        - name
+
+    UpdateRoleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+
+    RolesListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    # AUDIT
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+        entity:
+          type: string
+        entityId:
+          type: string
+        action:
+          type: string
+        userId:
+          type: string
+        userName:
+          type: string
+        fieldChanges:
+          type: object
+        source:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - entity
+        - action
+        - createdAt
+
+    AuditLogsListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLog"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    # CUSTOMER
+    Customer:
+      type: object
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [prospect, customer, inactive]
+        status:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        address:
+          $ref: "#/components/schemas/Address"
+        creditLimit:
+          type: number
+        paymentTerms:
+          type: string
+        taxId:
+          type: string
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - status
+
+    CreateCustomerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [prospect, customer, inactive]
+        email:
+          type: string
+        phone:
+          type: string
+        address:
+          $ref: "#/components/schemas/Address"
+        creditLimit:
+          type: number
+        paymentTerms:
+          type: string
+        taxId:
+          type: string
+        notes:
+          type: string
+      required:
+        - name
+
+    UpdateCustomerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [prospect, customer, inactive]
+        email:
+          type: string
+        phone:
+          type: string
+        address:
+          $ref: "#/components/schemas/Address"
+        creditLimit:
+          type: number
+        paymentTerms:
+          type: string
+        taxId:
+          type: string
+        notes:
+          type: string
+        status:
+          type: string
+
+    CustomersListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Customer"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    # CONTACT
+    Contact:
+      type: object
+      properties:
+        id:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        title:
+          type: string
+        customerId:
+          type: string
+        vendorId:
+          type: string
+        isPrimary:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - firstName
+        - lastName
+
+    CreateContactRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        title:
+          type: string
+        customerId:
+          type: string
+        vendorId:
+          type: string
+        isPrimary:
+          type: boolean
+      required:
+        - firstName
+        - lastName
+
+    ContactsListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Contact"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    # VENDOR
+    Vendor:
+      type: object
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, approved, pending]
+        email:
+          type: string
+        phone:
+          type: string
+        address:
+          $ref: "#/components/schemas/Address"
+        paymentTerms:
+          type: string
+        taxId:
+          type: string
+        leadTime:
+          type: integer
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - status
+
+    CreateVendorRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        address:
+          $ref: "#/components/schemas/Address"
+        paymentTerms:
+          type: string
+        taxId:
+          type: string
+        leadTime:
+          type: integer
+        notes:
+          type: string
+      required:
+        - name
+
+    UpdateVendorRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, approved, pending]
+        email:
+          type: string
+        phone:
+          type: string
+        address:
+          $ref: "#/components/schemas/Address"
+        paymentTerms:
+          type: string
+        taxId:
+          type: string
+        leadTime:
+          type: integer
+        notes:
+          type: string
+
+    VendorsListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Vendor"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    # ITEM
+    Item:
+      type: object
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [raw_material, purchased_part, manufactured, assembly, service, expense]
+        status:
+          type: string
+          enum: [active, inactive, obsolete, engineering]
+        uom:
+          type: string
+        category:
+          type: string
+        revision:
+          type: string
+        standardCost:
+          type: number
+        listPrice:
+          type: number
+        weight:
+          type: number
+        leadTime:
+          type: integer
+        reorderPoint:
+          type: number
+        reorderQty:
+          type: number
+        safetyStock:
+          type: number
+        lotTracked:
+          type: boolean
+        serialTracked:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - number
+        - name
+        - type
+        - status
+
+    CreateItemRequest:
+      type: object
+      properties:
+        number:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [raw_material, purchased_part, manufactured, assembly, service, expense]
+        uom:
+          type: string
+        category:
+          type: string
+        standardCost:
+          type: number
+        listPrice:
+          type: number
+        weight:
+          type: number
+        leadTime:
+          type: integer
+        reorderPoint:
+          type: number
+        reorderQty:
+          type: number
+        safetyStock:
+          type: number
+        lotTracked:
+          type: boolean
+        serialTracked:
+          type: boolean
+      required:
+        - number
+        - name
+        - type
+
+    UpdateItemRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, obsolete, engineering]
+        uom:
+          type: string
+        category:
+          type: string
+        standardCost:
+          type: number
+        listPrice:
+          type: number
+        weight:
+          type: number
+        leadTime:
+          type: integer
+        reorderPoint:
+          type: number
+        reorderQty:
+          type: number
+        safetyStock:
+          type: number
+        lotTracked:
+          type: boolean
+        serialTracked:
+          type: boolean
+
+    ItemsListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    # BOM
+    BomLine:
+      type: object
+      properties:
+        id:
+          type: string
+        sequence:
+          type: integer
+        itemId:
+          type: string
+        itemNumber:
+          type: string
+        itemName:
+          type: string
+        quantity:
+          type: number
+        uom:
+          type: string
+        scrapFactor:
+          type: number
+        notes:
+          type: string
+      required:
+        - id
+        - sequence
+        - itemId
+        - quantity
+
+    Bom:
+      type: object
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        itemId:
+          type: string
+        itemNumber:
+          type: string
+        itemName:
+          type: string
+        revision:
+          type: string
+        status:
+          type: string
+          enum: [draft, active, obsolete]
+        effectiveDate:
+          type: string
+          format: date
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/BomLine"
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - itemId
+        - revision
+        - status
+
+    CreateBomRequest:
+      type: object
+      properties:
+        itemId:
+          type: string
+        revision:
+          type: string
+        effectiveDate:
+          type: string
+          format: date
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              sequence:
+                type: integer
+              itemId:
+                type: string
+              quantity:
+                type: number
+              uom:
+                type: string
+              scrapFactor:
+                type: number
+              notes:
+                type: string
+            required:
+              - itemId
+              - quantity
+        notes:
+          type: string
+      required:
+        - itemId
+        - revision
+
+    UpdateBomRequest:
+      type: object
+      properties:
+        revision:
+          type: string
+        status:
+          type: string
+          enum: [draft, active, obsolete]
+        effectiveDate:
+          type: string
+          format: date
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              sequence:
+                type: integer
+              itemId:
+                type: string
+              quantity:
+                type: number
+              uom:
+                type: string
+              scrapFactor:
+                type: number
+              notes:
+                type: string
+        notes:
+          type: string
+
+    BomsListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Bom"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    # ROUTING
+    RoutingOperation:
+      type: object
+      properties:
+        id:
+          type: string
+        sequence:
+          type: integer
+        name:
+          type: string
+        workcenterId:
+          type: string
+        workcenterName:
+          type: string
+        setupTime:
+          type: number
+        runTime:
+          type: number
+        queueTime:
+          type: number
+        notes:
+          type: string
+      required:
+        - id
+        - sequence
+        - name
+        - workcenterId
+
+    Routing:
+      type: object
+      properties:
+        id:
+          type: string
+        itemId:
+          type: string
+        itemNumber:
+          type: string
+        itemName:
+          type: string
+        revision:
+          type: string
+        status:
+          type: string
+          enum: [draft, active, obsolete]
+        operations:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoutingOperation"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - itemId
+        - revision
+        - status
+
+    CreateRoutingRequest:
+      type: object
+      properties:
+        itemId:
+          type: string
+        revision:
+          type: string
+        operations:
+          type: array
+          items:
+            type: object
+            properties:
+              sequence:
+                type: integer
+              name:
+                type: string
+              workcenterId:
+                type: string
+              setupTime:
+                type: number
+              runTime:
+                type: number
+              queueTime:
+                type: number
+              notes:
+                type: string
+            required:
+              - sequence
+              - name
+              - workcenterId
+      required:
+        - itemId
+        - revision
+
+    RoutingsListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Routing"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    # WORK CENTER
+    Workcenter:
+      type: object
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        department:
+          type: string
+        capacity:
+          type: number
+        capacityUom:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, maintenance]
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - code
+        - name
+        - status
+
+    CreateWorkcenterRequest:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        department:
+          type: string
+        capacity:
+          type: number
+        capacityUom:
+          type: string
+        notes:
+          type: string
+      required:
+        - code
+        - name
+
+    WorkcentersListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Workcenter"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    # INVENTORY
+    InventoryBalance:
+      type: object
+      properties:
+        id:
+          type: string
+        itemId:
+          type: string
+        itemNumber:
+          type: string
+        itemName:
+          type: string
+        warehouseId:
+          type: string
+        warehouseName:
+          type: string
+        location:
+          type: string
+        quantityOnHand:
+          type: number
+        quantityAllocated:
+          type: number
+        quantityAvailable:
+          type: number
+        quantityOnOrder:
+          type: number
+        uom:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - itemId
+        - warehouseId
+        - quantityOnHand
+        - quantityAvailable
+
+    InventoryListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/InventoryBalance"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    InventoryTransaction:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [receipt, issue, adjustment, transfer, return, scrap, count]
+        itemId:
+          type: string
+        itemNumber:
+          type: string
+        itemName:
+          type: string
+        warehouseId:
+          type: string
+        quantity:
+          type: number
+        unitCost:
+          type: number
+        totalCost:
+          type: number
+        reference:
+          type: string
+        notes:
+          type: string
+        lotNumber:
+          type: string
+        serialNumber:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+      required:
+        - id
+        - type
+        - itemId
+        - quantity
+
+    CreateInventoryTransactionRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [receipt, issue, adjustment, transfer, return, scrap, count]
+        itemId:
+          type: string
+        warehouseId:
+          type: string
+        quantity:
+          type: number
+        unitCost:
+          type: number
+        reference:
+          type: string
+        notes:
+          type: string
+        lotNumber:
+          type: string
+        serialNumber:
+          type: string
+      required:
+        - type
+        - itemId
+        - warehouseId
+        - quantity
+
+    InventoryTransactionsListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/InventoryTransaction"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    Warehouse:
+      type: object
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        address:
+          $ref: "#/components/schemas/Address"
+        status:
+          type: string
+          enum: [active, inactive]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - code
+        - name
+        - status
+
+    CreateWarehouseRequest:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        address:
+          $ref: "#/components/schemas/Address"
+      required:
+        - code
+        - name
+
+    WarehousesListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Warehouse"
+      required:
+        - data
+
+    # QUOTES
+    OrderLine:
+      type: object
+      properties:
+        id:
+          type: string
+        lineNumber:
+          type: integer
+        itemId:
+          type: string
+        itemNumber:
+          type: string
+        itemName:
+          type: string
+        description:
+          type: string
+        quantity:
+          type: number
+        uom:
+          type: string
+        unitPrice:
+          type: number
+        discount:
+          type: number
+        lineTotal:
+          type: number
+        requestedDate:
+          type: string
+          format: date
+        promisedDate:
+          type: string
+          format: date
+        notes:
+          type: string
+      required:
+        - id
+        - lineNumber
+        - itemId
+        - quantity
+        - unitPrice
+
+    Quote:
+      type: object
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        customerId:
+          type: string
+        customerName:
+          type: string
+        status:
+          type: string
+          enum: [draft, sent, accepted, rejected, expired, converted]
+        quoteDate:
+          type: string
+          format: date
+        expiryDate:
+          type: string
+          format: date
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderLine"
+        subtotal:
+          type: number
+        taxAmount:
+          type: number
+        totalAmount:
+          type: number
+        notes:
+          type: string
+        terms:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - number
+        - customerId
+        - status
+
+    CreateQuoteRequest:
+      type: object
+      properties:
+        customerId:
+          type: string
+        quoteDate:
+          type: string
+          format: date
+        expiryDate:
+          type: string
+          format: date
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              itemId:
+                type: string
+              quantity:
+                type: number
+              unitPrice:
+                type: number
+              discount:
+                type: number
+              requestedDate:
+                type: string
+                format: date
+              notes:
+                type: string
+            required:
+              - itemId
+              - quantity
+              - unitPrice
+        notes:
+          type: string
+        terms:
+          type: string
+      required:
+        - customerId
+        - lines
+
+    UpdateQuoteRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [draft, sent, accepted, rejected, expired]
+        expiryDate:
+          type: string
+          format: date
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              itemId:
+                type: string
+              quantity:
+                type: number
+              unitPrice:
+                type: number
+              discount:
+                type: number
+              requestedDate:
+                type: string
+                format: date
+              notes:
+                type: string
+        notes:
+          type: string
+        terms:
+          type: string
+
+    QuotesListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Quote"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    # SALES ORDER
+    SalesOrder:
+      type: object
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        customerId:
+          type: string
+        customerName:
+          type: string
+        status:
+          type: string
+          enum: [draft, confirmed, in_production, ready_to_ship, partially_shipped, shipped, invoiced, closed, cancelled]
+        orderDate:
+          type: string
+          format: date
+        requestedDate:
+          type: string
+          format: date
+        promisedDate:
+          type: string
+          format: date
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderLine"
+        subtotal:
+          type: number
+        taxAmount:
+          type: number
+        totalAmount:
+          type: number
+        shippingAddress:
+          $ref: "#/components/schemas/Address"
+        notes:
+          type: string
+        terms:
+          type: string
+        quoteId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - number
+        - customerId
+        - status
+
+    CreateSalesOrderRequest:
+      type: object
+      properties:
+        customerId:
+          type: string
+        orderDate:
+          type: string
+          format: date
+        requestedDate:
+          type: string
+          format: date
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              itemId:
+                type: string
+              quantity:
+                type: number
+              unitPrice:
+                type: number
+              discount:
+                type: number
+              requestedDate:
+                type: string
+                format: date
+              notes:
+                type: string
+            required:
+              - itemId
+              - quantity
+              - unitPrice
+        shippingAddress:
+          $ref: "#/components/schemas/Address"
+        notes:
+          type: string
+        terms:
+          type: string
+      required:
+        - customerId
+        - lines
+
+    UpdateSalesOrderRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [draft, confirmed, cancelled]
+        requestedDate:
+          type: string
+          format: date
+        promisedDate:
+          type: string
+          format: date
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              itemId:
+                type: string
+              quantity:
+                type: number
+              unitPrice:
+                type: number
+              discount:
+                type: number
+              requestedDate:
+                type: string
+                format: date
+              notes:
+                type: string
+        shippingAddress:
+          $ref: "#/components/schemas/Address"
+        notes:
+          type: string
+
+    SalesOrdersListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SalesOrder"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    # PURCHASE ORDER
+    PurchaseOrderLine:
+      type: object
+      properties:
+        id:
+          type: string
+        lineNumber:
+          type: integer
+        itemId:
+          type: string
+        itemNumber:
+          type: string
+        itemName:
+          type: string
+        quantity:
+          type: number
+        quantityReceived:
+          type: number
+        uom:
+          type: string
+        unitCost:
+          type: number
+        lineTotal:
+          type: number
+        requestedDate:
+          type: string
+          format: date
+        promisedDate:
+          type: string
+          format: date
+        notes:
+          type: string
+      required:
+        - id
+        - lineNumber
+        - itemId
+        - quantity
+        - unitCost
+
+    PurchaseOrder:
+      type: object
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        vendorId:
+          type: string
+        vendorName:
+          type: string
+        status:
+          type: string
+          enum: [draft, sent, acknowledged, partially_received, received, cancelled, closed]
+        orderDate:
+          type: string
+          format: date
+        requestedDate:
+          type: string
+          format: date
+        promisedDate:
+          type: string
+          format: date
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/PurchaseOrderLine"
+        subtotal:
+          type: number
+        taxAmount:
+          type: number
+        totalAmount:
+          type: number
+        warehouseId:
+          type: string
+        notes:
+          type: string
+        terms:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - number
+        - vendorId
+        - status
+
+    CreatePurchaseOrderRequest:
+      type: object
+      properties:
+        vendorId:
+          type: string
+        orderDate:
+          type: string
+          format: date
+        requestedDate:
+          type: string
+          format: date
+        warehouseId:
+          type: string
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              itemId:
+                type: string
+              quantity:
+                type: number
+              unitCost:
+                type: number
+              requestedDate:
+                type: string
+                format: date
+              notes:
+                type: string
+            required:
+              - itemId
+              - quantity
+              - unitCost
+        notes:
+          type: string
+        terms:
+          type: string
+      required:
+        - vendorId
+        - lines
+
+    UpdatePurchaseOrderRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [draft, sent, acknowledged, cancelled]
+        requestedDate:
+          type: string
+          format: date
+        promisedDate:
+          type: string
+          format: date
+        warehouseId:
+          type: string
+        notes:
+          type: string
+
+    ReceivePORequest:
+      type: object
+      properties:
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              lineId:
+                type: string
+              quantityReceived:
+                type: number
+              lotNumber:
+                type: string
+              notes:
+                type: string
+            required:
+              - lineId
+              - quantityReceived
+        receivedDate:
+          type: string
+          format: date
+        notes:
+          type: string
+      required:
+        - lines
+
+    PurchaseOrdersListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PurchaseOrder"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    # WORK ORDER
+    WorkOrderOperation:
+      type: object
+      properties:
+        id:
+          type: string
+        sequence:
+          type: integer
+        name:
+          type: string
+        workcenterId:
+          type: string
+        workcenterName:
+          type: string
+        status:
+          type: string
+          enum: [pending, in_progress, complete, skipped]
+        scheduledStart:
+          type: string
+          format: date-time
+        scheduledEnd:
+          type: string
+          format: date-time
+        actualStart:
+          type: string
+          format: date-time
+        actualEnd:
+          type: string
+          format: date-time
+        setupTime:
+          type: number
+        runTime:
+          type: number
+        laborHours:
+          type: number
+      required:
+        - id
+        - sequence
+        - name
+        - status
+
+    WorkOrder:
+      type: object
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        itemId:
+          type: string
+        itemNumber:
+          type: string
+        itemName:
+          type: string
+        bomId:
+          type: string
+        routingId:
+          type: string
+        salesOrderId:
+          type: string
+        salesOrderNumber:
+          type: string
+        status:
+          type: string
+          enum: [draft, released, in_progress, complete, cancelled, on_hold]
+        type:
+          type: string
+          enum: [standard, rework, repair]
+        quantityOrdered:
+          type: number
+        quantityCompleted:
+          type: number
+        quantityScrapped:
+          type: number
+        uom:
+          type: string
+        scheduledStart:
+          type: string
+          format: date
+        scheduledEnd:
+          type: string
+          format: date
+        actualStart:
+          type: string
+          format: date
+        actualEnd:
+          type: string
+          format: date
+        operations:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkOrderOperation"
+        warehouseId:
+          type: string
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - number
+        - itemId
+        - status
+        - quantityOrdered
+
+    CreateWorkOrderRequest:
+      type: object
+      properties:
+        itemId:
+          type: string
+        bomId:
+          type: string
+        routingId:
+          type: string
+        salesOrderId:
+          type: string
+        type:
+          type: string
+          enum: [standard, rework, repair]
+        quantityOrdered:
+          type: number
+        scheduledStart:
+          type: string
+          format: date
+        scheduledEnd:
+          type: string
+          format: date
+        warehouseId:
+          type: string
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+        notes:
+          type: string
+      required:
+        - itemId
+        - quantityOrdered
+
+    UpdateWorkOrderRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [released, on_hold, cancelled]
+        scheduledStart:
+          type: string
+          format: date
+        scheduledEnd:
+          type: string
+          format: date
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+        notes:
+          type: string
+
+    CompleteWorkOrderRequest:
+      type: object
+      properties:
+        quantityCompleted:
+          type: number
+        quantityScrapped:
+          type: number
+        actualEnd:
+          type: string
+          format: date
+        notes:
+          type: string
+      required:
+        - quantityCompleted
+
+    WorkOrdersListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkOrder"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    # SHIPMENT
+    ShipmentLine:
+      type: object
+      properties:
+        id:
+          type: string
+        salesOrderLineId:
+          type: string
+        itemId:
+          type: string
+        itemNumber:
+          type: string
+        itemName:
+          type: string
+        quantity:
+          type: number
+        uom:
+          type: string
+        lotNumber:
+          type: string
+        serialNumber:
+          type: string
+      required:
+        - id
+        - itemId
+        - quantity
+
+    Shipment:
+      type: object
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        salesOrderId:
+          type: string
+        salesOrderNumber:
+          type: string
+        customerId:
+          type: string
+        customerName:
+          type: string
+        status:
+          type: string
+          enum: [draft, packed, shipped, delivered, cancelled]
+        shippedDate:
+          type: string
+          format: date
+        carrier:
+          type: string
+        trackingNumber:
+          type: string
+        shippingAddress:
+          $ref: "#/components/schemas/Address"
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShipmentLine"
+        warehouseId:
+          type: string
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - number
+        - salesOrderId
+        - status
+
+    CreateShipmentRequest:
+      type: object
+      properties:
+        salesOrderId:
+          type: string
+        shippedDate:
+          type: string
+          format: date
+        carrier:
+          type: string
+        trackingNumber:
+          type: string
+        shippingAddress:
+          $ref: "#/components/schemas/Address"
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              salesOrderLineId:
+                type: string
+              itemId:
+                type: string
+              quantity:
+                type: number
+              lotNumber:
+                type: string
+              serialNumber:
+                type: string
+            required:
+              - itemId
+              - quantity
+        warehouseId:
+          type: string
+        notes:
+          type: string
+      required:
+        - salesOrderId
+        - lines
+
+    ShipmentsListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Shipment"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    # INVOICE
+    InvoiceLine:
+      type: object
+      properties:
+        id:
+          type: string
+        itemId:
+          type: string
+        itemNumber:
+          type: string
+        description:
+          type: string
+        quantity:
+          type: number
+        unitPrice:
+          type: number
+        discount:
+          type: number
+        taxRate:
+          type: number
+        lineTotal:
+          type: number
+      required:
+        - id
+        - description
+        - quantity
+        - unitPrice
+
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        customerId:
+          type: string
+        customerName:
+          type: string
+        salesOrderId:
+          type: string
+        salesOrderNumber:
+          type: string
+        shipmentId:
+          type: string
+        status:
+          type: string
+          enum: [draft, sent, partial, paid, overdue, cancelled, void]
+        invoiceDate:
+          type: string
+          format: date
+        dueDate:
+          type: string
+          format: date
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceLine"
+        subtotal:
+          type: number
+        taxAmount:
+          type: number
+        totalAmount:
+          type: number
+        amountPaid:
+          type: number
+        amountDue:
+          type: number
+        paymentTerms:
+          type: string
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - number
+        - customerId
+        - status
+
+    CreateInvoiceRequest:
+      type: object
+      properties:
+        customerId:
+          type: string
+        salesOrderId:
+          type: string
+        shipmentId:
+          type: string
+        invoiceDate:
+          type: string
+          format: date
+        dueDate:
+          type: string
+          format: date
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              itemId:
+                type: string
+              description:
+                type: string
+              quantity:
+                type: number
+              unitPrice:
+                type: number
+              discount:
+                type: number
+              taxRate:
+                type: number
+            required:
+              - description
+              - quantity
+              - unitPrice
+        paymentTerms:
+          type: string
+        notes:
+          type: string
+      required:
+        - customerId
+        - lines
+
+    InvoicesListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Invoice"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    # QUALITY
+    Inspection:
+      type: object
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        type:
+          type: string
+          enum: [incoming, in_process, final]
+        status:
+          type: string
+          enum: [pending, in_progress, passed, failed, conditionally_passed]
+        itemId:
+          type: string
+        itemNumber:
+          type: string
+        itemName:
+          type: string
+        quantity:
+          type: number
+        quantityPassed:
+          type: number
+        quantityFailed:
+          type: number
+        reference:
+          type: string
+        lotNumber:
+          type: string
+        inspectedBy:
+          type: string
+        inspectedAt:
+          type: string
+          format: date-time
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - number
+        - type
+        - status
+        - itemId
+
+    CreateInspectionRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [incoming, in_process, final]
+        itemId:
+          type: string
+        quantity:
+          type: number
+        reference:
+          type: string
+        lotNumber:
+          type: string
+        notes:
+          type: string
+      required:
+        - type
+        - itemId
+        - quantity
+
+    InspectionsListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Inspection"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    Nonconformance:
+      type: object
+      properties:
+        id:
+          type: string
+        number:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [open, under_review, pending_disposition, closed, voided]
+        severity:
+          type: string
+          enum: [minor, major, critical]
+        itemId:
+          type: string
+        itemNumber:
+          type: string
+        defectCode:
+          type: string
+        disposition:
+          type: string
+          enum: [use_as_is, rework, scrap, return_to_vendor]
+        quantityAffected:
+          type: number
+        lotNumber:
+          type: string
+        containmentAction:
+          type: string
+        rootCause:
+          type: string
+        correctiveAction:
+          type: string
+        reportedBy:
+          type: string
+        assignedTo:
+          type: string
+        closedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - number
+        - title
+        - status
+        - severity
+
+    CreateNonconformanceRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        severity:
+          type: string
+          enum: [minor, major, critical]
+        itemId:
+          type: string
+        defectCode:
+          type: string
+        quantityAffected:
+          type: number
+        lotNumber:
+          type: string
+        containmentAction:
+          type: string
+        rootCause:
+          type: string
+        assignedTo:
+          type: string
+      required:
+        - title
+        - severity
+
+    NonconformancesListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Nonconformance"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    # MRP
+    MrpRun:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [queued, running, complete, failed]
+        type:
+          type: string
+          enum: [full_regen, net_change]
+        planningHorizon:
+          type: integer
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        summaryStats:
+          type: object
+          properties:
+            plannedPOs:
+              type: integer
+            plannedWOs:
+              type: integer
+            shortages:
+              type: integer
+            rescheduleMessages:
+              type: integer
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - status
+        - type
+
+    RunMrpRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [full_regen, net_change]
+        planningHorizon:
+          type: integer
+      required:
+        - type
+
+    MrpRecommendation:
+      type: object
+      properties:
+        id:
+          type: string
+        runId:
+          type: string
+        type:
+          type: string
+          enum: [planned_po, planned_wo, reschedule, shortage, cancel]
+        itemId:
+          type: string
+        itemNumber:
+          type: string
+        itemName:
+          type: string
+        quantity:
+          type: number
+        neededDate:
+          type: string
+          format: date
+        vendorId:
+          type: string
+        priority:
+          type: string
+        message:
+          type: string
+        status:
+          type: string
+          enum: [open, released, accepted, rejected]
+      required:
+        - id
+        - runId
+        - type
+        - itemId
+        - quantity
+
+    MrpRunsListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/MrpRun"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    MrpRecommendationsListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/MrpRecommendation"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    # PLANNING SCENARIOS
+    PlanningScenario:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [draft, active, published, archived]
+        baselineRunId:
+          type: string
+        modifications:
+          type: object
+        comparisonResult:
+          type: object
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - status
+
+    CreatePlanningScenarioRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        baselineRunId:
+          type: string
+        modifications:
+          type: object
+      required:
+        - name
+
+    PlanningScenariosListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanningScenario"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    # DASHBOARD
+    DashboardWidget:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [kpi, chart, list, alert, mrp_summary, recent_orders, inventory_alerts, production_status]
+        title:
+          type: string
+        config:
+          type: object
+        position:
+          type: object
+          properties:
+            x:
+              type: integer
+            y:
+              type: integer
+            w:
+              type: integer
+            h:
+              type: integer
+      required:
+        - id
+        - type
+        - title
+
+    DashboardWidgetsResponse:
+      type: object
+      properties:
+        widgets:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardWidget"
+      required:
+        - widgets
+
+    SaveDashboardWidgetsRequest:
+      type: object
+      properties:
+        widgets:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardWidget"
+      required:
+        - widgets
+
+    DashboardKpi:
+      type: object
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        value:
+          type: number
+        unit:
+          type: string
+        trend:
+          type: number
+        trendLabel:
+          type: string
+        status:
+          type: string
+          enum: [good, warning, critical, neutral]
+      required:
+        - key
+        - label
+        - value
+
+    DashboardKpisResponse:
+      type: object
+      properties:
+        kpis:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardKpi"
+        openSalesOrders:
+          type: integer
+        openPurchaseOrders:
+          type: integer
+        openWorkOrders:
+          type: integer
+        pendingInspections:
+          type: integer
+        openNonconformances:
+          type: integer
+        lowInventoryItems:
+          type: integer
+        overdueInvoices:
+          type: integer
+        recentRevenue:
+          type: number
+      required:
+        - kpis
+
+    # SEARCH
+    SearchResult:
+      type: object
+      properties:
+        entity:
+          type: string
+        id:
+          type: string
+        number:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        metadata:
+          type: object
+        score:
+          type: number
+      required:
+        - entity
+        - id
+        - name
+
+    SearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchResult"
+        total:
+          type: integer
+        query:
+          type: string
+      required:
+        - results
+        - total
+        - query
+
+    # SMART TRANSFER
+    SmartTransferJob:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        sourceType:
+          type: string
+          enum: [postgresql, mysql, mssql, oracle, csv, excel, json]
+        status:
+          type: string
+          enum: [draft, ready, running, complete, failed, rolled_back]
+        targetEntity:
+          type: string
+        mappingTemplateId:
+          type: string
+        totalRecords:
+          type: integer
+        processedRecords:
+          type: integer
+        errorRecords:
+          type: integer
+        isDryRun:
+          type: boolean
+        errorLog:
+          type: array
+          items:
+            type: object
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - sourceType
+        - status
+
+    CreateSmartTransferJobRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        sourceType:
+          type: string
+          enum: [postgresql, mysql, mssql, oracle, csv, excel, json]
+        sourceConfig:
+          type: object
+        targetEntity:
+          type: string
+        fieldMappings:
+          type: array
+          items:
+            type: object
+            properties:
+              sourceField:
+                type: string
+              targetField:
+                type: string
+              transform:
+                type: string
+            required:
+              - sourceField
+              - targetField
+        mappingTemplateId:
+          type: string
+        isDryRun:
+          type: boolean
+      required:
+        - name
+        - sourceType
+        - targetEntity
+
+    RunSmartTransferJobRequest:
+      type: object
+      properties:
+        isDryRun:
+          type: boolean
+
+    SmartTransferJobsListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SmartTransferJob"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+      required:
+        - data
+        - meta
+
+    SmartTransferMapping:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        sourceType:
+          type: string
+        targetEntity:
+          type: string
+        fieldMappings:
+          type: array
+          items:
+            type: object
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - targetEntity
+
+    SmartTransferMappingsListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SmartTransferMapping"
+      required:
+        - data
+
+    # SHARED
+    Address:
+      type: object
+      properties:
+        line1:
+          type: string
+        line2:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        postalCode:
+          type: string
+        country:
+          type: string
