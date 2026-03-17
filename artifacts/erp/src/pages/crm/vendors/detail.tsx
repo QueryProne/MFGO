@@ -1,7 +1,7 @@
 import { useRoute, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { api, type Customer, type CustomerAddress, type CustomerContact, type SalesOrder } from "@/lib/api";
+import { api, type Vendor, type VendorAddress, type VendorContact } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,11 +9,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
-  Users, ArrowLeft, Mail, Phone, Globe, MapPin, Star,
-  CreditCard, ClipboardList, Plus, Trash2, User, Building2,
+  Building2, ArrowLeft, Mail, Phone, Globe, MapPin, Star,
+  CheckCircle, Users, ClipboardList, Plus, Trash2, User,
+  ShieldCheck, BadgeCheck,
 } from "lucide-react";
 
-function Field({ label, children }: { label: string; children?: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-0.5">
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60">{label}</div>
@@ -25,18 +26,18 @@ function Field({ label, children }: { label: string; children?: React.ReactNode 
 const STATUS_COLOR: Record<string, string> = {
   active:   "bg-emerald-900/60 text-emerald-200",
   inactive: "bg-zinc-700 text-zinc-300",
-  prospect: "bg-blue-900/60 text-blue-200",
   hold:     "bg-red-900/60 text-red-200",
 };
-const SO_STATUS_COLOR: Record<string, string> = {
-  draft:     "bg-zinc-700 text-zinc-300",
-  confirmed: "bg-blue-900/60 text-blue-200",
-  partial:   "bg-amber-900/60 text-amber-200",
-  shipped:   "bg-emerald-900/60 text-emerald-200",
-  closed:    "bg-zinc-800 text-zinc-400",
+
+const PO_STATUS_COLOR: Record<string, string> = {
+  draft:    "bg-zinc-700 text-zinc-300",
+  sent:     "bg-blue-900/60 text-blue-200",
+  partial:  "bg-amber-900/60 text-amber-200",
+  received: "bg-emerald-900/60 text-emerald-200",
+  closed:   "bg-zinc-800 text-zinc-400",
 };
 
-function AddressCard({ addr, onDelete }: { addr: CustomerAddress; onDelete: () => void }) {
+function AddressCard({ addr, onDelete }: { addr: VendorAddress; onDelete: () => void }) {
   return (
     <div className="bg-muted/20 border border-border rounded-lg p-3 space-y-1 relative group">
       {addr.isDefault && (
@@ -61,7 +62,7 @@ function AddressCard({ addr, onDelete }: { addr: CustomerAddress; onDelete: () =
   );
 }
 
-function ContactRow({ contact, onDelete }: { contact: CustomerContact; onDelete: () => void }) {
+function ContactRow({ contact, onDelete }: { contact: VendorContact; onDelete: () => void }) {
   return (
     <TableRow className="border-border hover:bg-muted/20 group">
       <TableCell>
@@ -87,9 +88,9 @@ function ContactRow({ contact, onDelete }: { contact: CustomerContact; onDelete:
       <TableCell className="text-xs text-muted-foreground">{contact.phone ?? "—"}</TableCell>
       <TableCell>
         <div className="flex gap-1 flex-wrap">
-          {contact.isSalesContact && <Badge className="text-[10px] bg-blue-900/40 text-blue-300">Sales</Badge>}
+          {contact.isPurchasingContact && <Badge className="text-[10px] bg-blue-900/40 text-blue-300">Purchasing</Badge>}
+          {contact.isQualityContact && <Badge className="text-[10px] bg-purple-900/40 text-purple-300">Quality</Badge>}
           {contact.isAccountingContact && <Badge className="text-[10px] bg-amber-900/40 text-amber-300">Accounting</Badge>}
-          {contact.isServiceContact && <Badge className="text-[10px] bg-purple-900/40 text-purple-300">Service</Badge>}
         </div>
       </TableCell>
       <TableCell className="text-right">
@@ -106,27 +107,27 @@ function ContactRow({ contact, onDelete }: { contact: CustomerContact; onDelete:
   );
 }
 
-export default function CustomerDetail() {
-  const [, params] = useRoute("/customers/:id");
+export default function VendorDetail() {
+  const [, params] = useRoute("/vendors/:id");
   const { toast } = useToast();
   const qc = useQueryClient();
   const [tab, setTab] = useState("overview");
 
-  const { data: customer, isLoading } = useQuery<Customer>({
-    queryKey: ["customer", params?.id],
-    queryFn: () => api.get(`/customers/${params!.id}`),
+  const { data: vendor, isLoading } = useQuery<Vendor>({
+    queryKey: ["vendor", params?.id],
+    queryFn: () => api.get(`/vendors/${params!.id}`),
     enabled: !!params?.id,
   });
 
   const deleteAddr = useMutation({
-    mutationFn: (addrId: string) => api.delete(`/customers/${params!.id}/addresses/${addrId}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["customer", params?.id] }); toast({ title: "Address removed" }); },
+    mutationFn: (addrId: string) => api.delete(`/vendors/${params!.id}/addresses/${addrId}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["vendor", params?.id] }); toast({ title: "Address removed" }); },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const deleteContact = useMutation({
-    mutationFn: (cid: string) => api.delete(`/customers/${params!.id}/contacts/${cid}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["customer", params?.id] }); toast({ title: "Contact removed" }); },
+    mutationFn: (cid: string) => api.delete(`/vendors/${params!.id}/contacts/${cid}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["vendor", params?.id] }); toast({ title: "Contact removed" }); },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
@@ -135,23 +136,19 @@ export default function CustomerDetail() {
       <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-primary" />
     </div>
   );
-  if (!customer) return <div className="p-8 text-muted-foreground">Customer not found.</div>;
+  if (!vendor) return <div className="p-8 text-muted-foreground">Vendor not found.</div>;
 
-  const addresses = customer.addresses ?? [];
-  const contacts = customer.contacts ?? [];
-  const recentOrders = customer.recentOrders ?? [];
-
-  const creditUsed = Number(customer.creditUsed ?? 0);
-  const creditLimit = Number(customer.creditLimit ?? 0);
-  const creditPct = creditLimit > 0 ? Math.min((creditUsed / creditLimit) * 100, 100) : 0;
+  const addresses = vendor.addresses ?? [];
+  const contacts = vendor.contacts ?? [];
+  const recentPOs = vendor.recentPOs ?? [];
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-4 px-6 py-4 border-b border-border bg-card/40">
-        <Link to="/customers">
+        <Link to="/vendors">
           <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" /> Customers
+            <ArrowLeft className="h-4 w-4" /> Vendors
           </Button>
         </Link>
         <div className="h-4 w-px bg-border" />
@@ -160,18 +157,28 @@ export default function CustomerDetail() {
             <Building2 className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold font-display text-foreground">{customer.name}</h1>
-            <p className="text-xs text-muted-foreground font-mono">{customer.number} · {customer.type}</p>
+            <h1 className="text-lg font-semibold font-display text-foreground">{vendor.name}</h1>
+            <p className="text-xs text-muted-foreground font-mono">{vendor.number} · {vendor.vendorType?.replace("_", " ")}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Badge className={cn("text-xs", STATUS_COLOR[customer.status] ?? "bg-zinc-700 text-zinc-200")}>
-            {customer.status}
+          {vendor.isPreferred && (
+            <Badge className="gap-1 bg-amber-900/40 text-amber-300 border-amber-700/40">
+              <Star className="h-3 w-3 fill-amber-400" /> Preferred
+            </Badge>
+          )}
+          {vendor.isApproved && (
+            <Badge className="gap-1 bg-emerald-900/40 text-emerald-300 border-emerald-700/40">
+              <BadgeCheck className="h-3 w-3" /> Approved
+            </Badge>
+          )}
+          <Badge className={cn("text-xs", STATUS_COLOR[vendor.status] ?? "bg-zinc-700 text-zinc-200")}>
+            {vendor.status}
           </Badge>
           <Button size="sm" variant="outline">Edit</Button>
-          <Link to="/salesorders">
+          <Link to="/purchaseorders">
             <Button size="sm" className="gap-1.5">
-              <Plus className="h-3.5 w-3.5" /> New Order
+              <Plus className="h-3.5 w-3.5" /> New PO
             </Button>
           </Link>
         </div>
@@ -188,8 +195,8 @@ export default function CustomerDetail() {
             <TabsTrigger value="contacts" className="text-xs">
               Contacts {contacts.length > 0 && <Badge variant="outline" className="ml-1 text-[10px] px-1">{contacts.length}</Badge>}
             </TabsTrigger>
-            <TabsTrigger value="orders" className="text-xs">
-              Sales Orders {recentOrders.length > 0 && <Badge variant="outline" className="ml-1 text-[10px] px-1">{recentOrders.length}</Badge>}
+            <TabsTrigger value="pos" className="text-xs">
+              Purchase Orders {recentPOs.length > 0 && <Badge variant="outline" className="ml-1 text-[10px] px-1">{recentPOs.length}</Badge>}
             </TabsTrigger>
           </TabsList>
 
@@ -198,83 +205,65 @@ export default function CustomerDetail() {
             <TabsContent value="overview" className="space-y-4 mt-0">
               <div className="grid grid-cols-3 gap-4">
                 {/* Contact Info */}
-                <div className="bg-card border border-border rounded-lg p-4 space-y-3">
+                <div className="col-span-1 bg-card border border-border rounded-lg p-4 space-y-3">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Contact Info</h3>
-                  {customer.email && (
+                  {vendor.email && (
                     <div className="flex items-center gap-2 text-sm">
                       <Mail className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <a href={`mailto:${customer.email}`} className="text-primary hover:underline truncate">{customer.email}</a>
+                      <a href={`mailto:${vendor.email}`} className="text-primary hover:underline truncate">{vendor.email}</a>
                     </div>
                   )}
-                  {customer.phone && (
+                  {vendor.phone && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Phone className="h-3.5 w-3.5 shrink-0" />{customer.phone}
+                      <Phone className="h-3.5 w-3.5 shrink-0" />{vendor.phone}
                     </div>
                   )}
-                  {customer.website && (
+                  {vendor.website && (
                     <div className="flex items-center gap-2 text-sm">
                       <Globe className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <a href={customer.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate">{customer.website}</a>
+                      <a href={vendor.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate">{vendor.website}</a>
                     </div>
                   )}
-                  {customer.billingAddress && (
+                  {vendor.billingAddress && (
                     <div className="flex items-start gap-2 text-sm text-muted-foreground">
                       <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                      <span className="text-xs leading-relaxed">{customer.billingAddress}</span>
+                      <span className="text-xs leading-relaxed">{vendor.billingAddress}</span>
                     </div>
                   )}
                 </div>
 
-                {/* Financials */}
-                <div className="bg-card border border-border rounded-lg p-4 space-y-3">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 flex items-center gap-1.5">
-                    <CreditCard className="h-3.5 w-3.5" /> Financials
-                  </h3>
+                {/* Purchasing Terms */}
+                <div className="col-span-1 bg-card border border-border rounded-lg p-4 space-y-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Purchasing Terms</h3>
                   <div className="grid grid-cols-2 gap-3">
-                    <Field label="Payment Terms">{customer.paymentTerms}</Field>
-                    <Field label="Currency">{customer.currency}</Field>
-                    <Field label="Credit Limit">{creditLimit > 0 ? `$${creditLimit.toLocaleString()}` : "—"}</Field>
-                    <Field label="Credit Used">{creditUsed > 0 ? `$${creditUsed.toLocaleString()}` : "$0"}</Field>
+                    <Field label="Payment Terms">{vendor.paymentTerms}</Field>
+                    <Field label="Currency">{vendor.currency}</Field>
+                    <Field label="Lead Time">{vendor.leadTime ? `${vendor.leadTime} days` : "—"}</Field>
+                    <Field label="Type">{vendor.vendorType?.replace("_", " ")}</Field>
                   </div>
-                  {creditLimit > 0 && (
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Credit Usage</span>
-                        <span className={cn(creditPct > 80 ? "text-red-400" : creditPct > 60 ? "text-amber-400" : "text-emerald-400")}>
-                          {creditPct.toFixed(0)}%
-                        </span>
-                      </div>
-                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className={cn("h-full rounded-full transition-all", creditPct > 80 ? "bg-red-500" : creditPct > 60 ? "bg-amber-500" : "bg-emerald-500")}
-                          style={{ width: `${creditPct}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
                 </div>
 
-                {/* Stats */}
-                <div className="bg-card border border-border rounded-lg p-4 space-y-3">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Activity</h3>
+                {/* Status / Stats */}
+                <div className="col-span-1 bg-card border border-border rounded-lg p-4 space-y-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Status</h3>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Open Orders</span>
-                      <span className="text-sm font-medium tabular-nums text-foreground">
-                        {recentOrders.filter(o => !["closed", "cancelled"].includes(o.status)).length}
-                      </span>
+                      <span className="text-xs text-muted-foreground">Approved</span>
+                      <div className={cn("h-2 w-2 rounded-full", vendor.isApproved ? "bg-emerald-400" : "bg-zinc-600")} />
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Total Orders</span>
-                      <span className="text-sm font-medium tabular-nums text-foreground">{recentOrders.length}</span>
+                      <span className="text-xs text-muted-foreground">Preferred</span>
+                      <div className={cn("h-2 w-2 rounded-full", vendor.isPreferred ? "bg-amber-400" : "bg-zinc-600")} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Open POs</span>
+                      <span className="text-sm font-medium tabular-nums text-foreground">
+                        {recentPOs.filter(p => !["closed", "received"].includes(p.status)).length}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">Contacts</span>
                       <span className="text-sm font-medium tabular-nums text-foreground">{contacts.length}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Addresses</span>
-                      <span className="text-sm font-medium tabular-nums text-foreground">{addresses.length}</span>
                     </div>
                   </div>
                 </div>
@@ -293,17 +282,17 @@ export default function CustomerDetail() {
                     <div className="flex-1 grid grid-cols-4 gap-3">
                       <Field label="Name">{c.firstName} {c.lastName}</Field>
                       <Field label="Title">{c.title}</Field>
-                      <Field label="Email">{c.email ? <a href={`mailto:${c.email}`} className="text-primary hover:underline">{c.email}</a> : undefined}</Field>
+                      <Field label="Email">{c.email ? <a href={`mailto:${c.email}`} className="text-primary hover:underline">{c.email}</a> : "—"}</Field>
                       <Field label="Phone">{c.phone}</Field>
                     </div>
                   </div>
                 </div>
               ))}
 
-              {customer.notes && (
+              {vendor.notes && (
                 <div className="bg-card border border-border rounded-lg p-4">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 mb-2">Notes</h3>
-                  <p className="text-sm text-muted-foreground">{customer.notes}</p>
+                  <p className="text-sm text-muted-foreground">{vendor.notes}</p>
                 </div>
               )}
             </TabsContent>
@@ -366,27 +355,27 @@ export default function CustomerDetail() {
               )}
             </TabsContent>
 
-            {/* ── SALES ORDERS ── */}
-            <TabsContent value="orders" className="mt-0">
+            {/* ── PURCHASE ORDERS ── */}
+            <TabsContent value="pos" className="mt-0">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-foreground">Recent Sales Orders</h3>
-                <Link to="/salesorders">
+                <h3 className="text-sm font-medium text-foreground">Recent Purchase Orders</h3>
+                <Link to="/purchaseorders">
                   <Button size="sm" variant="outline" className="gap-1.5">
-                    <Plus className="h-3.5 w-3.5" /> New Order
+                    <Plus className="h-3.5 w-3.5" /> New PO
                   </Button>
                 </Link>
               </div>
-              {recentOrders.length === 0 ? (
+              {recentPOs.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground text-sm border border-dashed border-border rounded-lg">
                   <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                  No sales orders for this customer.
+                  No purchase orders found for this vendor.
                 </div>
               ) : (
                 <div className="bg-card border border-border rounded-lg overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow className="border-border hover:bg-transparent">
-                        <TableHead className="text-xs text-muted-foreground">Order #</TableHead>
+                        <TableHead className="text-xs text-muted-foreground">PO Number</TableHead>
                         <TableHead className="text-xs text-muted-foreground">Status</TableHead>
                         <TableHead className="text-xs text-muted-foreground">Order Date</TableHead>
                         <TableHead className="text-xs text-muted-foreground">Needed By</TableHead>
@@ -394,22 +383,22 @@ export default function CustomerDetail() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {recentOrders.map(so => (
-                        <TableRow key={so.id} className="border-border hover:bg-muted/20">
+                      {recentPOs.map(po => (
+                        <TableRow key={po.id} className="border-border hover:bg-muted/20">
                           <TableCell>
-                            <Link to={`/salesorders/${so.id}`} className="font-mono text-xs text-primary hover:underline">
-                              {so.number}
+                            <Link to={`/purchaseorders/${po.id}`} className="font-mono text-xs text-primary hover:underline">
+                              {po.number}
                             </Link>
                           </TableCell>
                           <TableCell>
-                            <Badge className={cn("text-xs", SO_STATUS_COLOR[so.status] ?? "bg-zinc-700 text-zinc-300")}>
-                              {so.status}
+                            <Badge className={cn("text-xs", PO_STATUS_COLOR[po.status] ?? "bg-zinc-700 text-zinc-300")}>
+                              {po.status}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{so.orderDate ?? "—"}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{so.requestedDate ?? "—"}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{po.orderDate ?? "—"}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{po.requestedDate ?? "—"}</TableCell>
                           <TableCell className="text-right text-sm tabular-nums text-foreground">
-                            {so.totalAmount ? `$${Number(so.totalAmount).toLocaleString()}` : "—"}
+                            {po.totalAmount ? `$${Number(po.totalAmount).toLocaleString()}` : "—"}
                           </TableCell>
                         </TableRow>
                       ))}

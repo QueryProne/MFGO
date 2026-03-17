@@ -1,5 +1,6 @@
 import app from "./app";
 import { seed } from "./lib/seed";
+import { seedGoKart } from "./lib/gokart-seed";
 
 const rawPort = process.env["PORT"];
 
@@ -21,5 +22,10 @@ app.listen(port, async () => {
     await seed();
   } catch (e) {
     console.error("[seed] Failed:", e);
+  }
+  try {
+    await seedGoKart();
+  } catch (e) {
+    console.error("[gokart-seed] Failed:", e);
   }
 });

@@ -2,7 +2,7 @@ import { pgTable, text, timestamp, numeric, date, boolean } from "drizzle-orm/pg
 import { itemsTable } from "./items";
 import { bomsTable, bomLinesTable, routingsTable } from "./engineering";
 import { salesOrdersTable, salesOrderLinesTable } from "./sales";
-import { warehousesTable } from "./inventory";
+import { warehousesTable, stockLocationsTable, binsTable, inventoryLotsTable, inventorySerialsTable } from "./inventory";
 import { customersTable } from "./crm";
 
 export const workOrdersTable = pgTable("work_orders", {
@@ -25,6 +25,7 @@ export const workOrdersTable = pgTable("work_orders", {
   actualStart: date("actual_start"),
   actualEnd: date("actual_end"),
   warehouseId: text("warehouse_id").references(() => warehousesTable.id),
+  completionLocationId: text("completion_location_id").references(() => stockLocationsTable.id),
   priority: text("priority").default("normal"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -54,12 +55,55 @@ export const workOrderMaterialsTable = pgTable("work_order_materials", {
   itemId: text("item_id").notNull().references(() => itemsTable.id),
   requiredQty: numeric("required_qty", { precision: 15, scale: 6 }).notNull(),
   issuedQty: numeric("issued_qty", { precision: 15, scale: 6 }).default("0"),
+  returnedQty: numeric("returned_qty", { precision: 15, scale: 6 }).default("0"),
   allocatedQty: numeric("allocated_qty", { precision: 15, scale: 6 }).default("0"),
   shortageQty: numeric("shortage_qty", { precision: 15, scale: 6 }).default("0"),
+  issueMethod: text("issue_method").default("push"),
   supplyTypeSnapshot: text("supply_type_snapshot"),
   sourceWorkOrderId: text("source_work_order_id"),
   uom: text("uom").default("EA"),
   notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const workOrderMaterialIssuesTable = pgTable("work_order_material_issues", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  workOrderId: text("work_order_id").notNull().references(() => workOrdersTable.id),
+  workOrderMaterialId: text("work_order_material_id").references(() => workOrderMaterialsTable.id),
+  itemId: text("item_id").notNull().references(() => itemsTable.id),
+  issuedQty: numeric("issued_qty", { precision: 15, scale: 6 }).notNull(),
+  returnedQty: numeric("returned_qty", { precision: 15, scale: 6 }).default("0"),
+  uom: text("uom").default("EA"),
+  unitCost: numeric("unit_cost", { precision: 15, scale: 4 }),
+  warehouseId: text("warehouse_id").references(() => warehousesTable.id),
+  stockLocationId: text("stock_location_id").references(() => stockLocationsTable.id),
+  binId: text("bin_id").references(() => binsTable.id),
+  lotId: text("lot_id").references(() => inventoryLotsTable.id),
+  serialId: text("serial_id").references(() => inventorySerialsTable.id),
+  lotNumber: text("lot_number"),
+  serialNumber: text("serial_number"),
+  issueType: text("issue_type").notNull().default("issue"),
+  issuedBy: text("issued_by"),
+  notes: text("notes"),
+  issuedAt: timestamp("issued_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const workOrderCompletionsTable = pgTable("work_order_completions", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  workOrderId: text("work_order_id").notNull().references(() => workOrdersTable.id),
+  completionNumber: text("completion_number").notNull(),
+  quantityCompleted: numeric("quantity_completed", { precision: 15, scale: 6 }).notNull(),
+  quantityScrapped: numeric("quantity_scrapped", { precision: 15, scale: 6 }).default("0"),
+  uom: text("uom").default("EA"),
+  warehouseId: text("warehouse_id").references(() => warehousesTable.id),
+  stockLocationId: text("stock_location_id").references(() => stockLocationsTable.id),
+  binId: text("bin_id").references(() => binsTable.id),
+  lotNumber: text("lot_number"),
+  serialNumbers: text("serial_numbers"),
+  completedBy: text("completed_by"),
+  notes: text("notes"),
+  completedAt: timestamp("completed_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -87,4 +131,6 @@ export const serviceOrdersTable = pgTable("service_orders", {
 export type WorkOrder = typeof workOrdersTable.$inferSelect;
 export type WorkOrderOperation = typeof workOrderOperationsTable.$inferSelect;
 export type WorkOrderMaterial = typeof workOrderMaterialsTable.$inferSelect;
+export type WorkOrderMaterialIssue = typeof workOrderMaterialIssuesTable.$inferSelect;
+export type WorkOrderCompletion = typeof workOrderCompletionsTable.$inferSelect;
 export type ServiceOrder = typeof serviceOrdersTable.$inferSelect;

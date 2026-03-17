@@ -14,6 +14,7 @@ import planningPurchasingRouter from "./planning-purchasing";
 import dashboardRouter from "./dashboard";
 import searchRouter from "./search";
 import smartTransferRouter from "./smarttransfer";
+import receivingRouter from "./receiving";
 
 const router: IRouter = Router();
 
@@ -49,5 +50,6 @@ router.use(planningPurchasingRouter);
 router.use(dashboardRouter);
 router.use(searchRouter);
 router.use(smartTransferRouter);
+router.use(receivingRouter);
 
 export default router;

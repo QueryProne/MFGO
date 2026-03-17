@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, numeric, integer, date, boolean } from "drizzle-orm/pg-core";
 import { vendorsTable } from "./crm";
 import { itemsTable } from "./items";
-import { warehousesTable } from "./inventory";
+import { warehousesTable, stockLocationsTable, binsTable } from "./inventory";
 
 export const itemVendorsTable = pgTable("item_vendors", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -60,6 +60,47 @@ export const purchaseOrderLinesTable = pgTable("purchase_order_lines", {
   notes: text("notes"),
 });
 
+export const receiptsTable = pgTable("receipts", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  number: text("number").notNull().unique(),
+  purchaseOrderId: text("purchase_order_id").references(() => purchaseOrdersTable.id),
+  vendorId: text("vendor_id").notNull().references(() => vendorsTable.id),
+  status: text("status").notNull().default("draft"),
+  receiptDate: date("receipt_date"),
+  packingSlipNumber: text("packing_slip_number"),
+  warehouseId: text("warehouse_id").references(() => warehousesTable.id),
+  stockLocationId: text("stock_location_id").references(() => stockLocationsTable.id),
+  inspectionRequired: boolean("inspection_required").default(false),
+  notes: text("notes"),
+  receivedBy: text("received_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const receiptLinesTable = pgTable("receipt_lines", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  receiptId: text("receipt_id").notNull().references(() => receiptsTable.id, { onDelete: "cascade" }),
+  purchaseOrderLineId: text("purchase_order_line_id").references(() => purchaseOrderLinesTable.id),
+  itemId: text("item_id").notNull().references(() => itemsTable.id),
+  lineNumber: integer("line_number").notNull(),
+  receivedQty: numeric("received_qty", { precision: 15, scale: 6 }).notNull().default("0"),
+  acceptedQty: numeric("accepted_qty", { precision: 15, scale: 6 }).notNull().default("0"),
+  rejectedQty: numeric("rejected_qty", { precision: 15, scale: 6 }).notNull().default("0"),
+  uom: text("uom").default("EA"),
+  unitCost: numeric("unit_cost", { precision: 15, scale: 4 }),
+  warehouseId: text("warehouse_id").references(() => warehousesTable.id),
+  stockLocationId: text("stock_location_id").references(() => stockLocationsTable.id),
+  binId: text("bin_id").references(() => binsTable.id),
+  lotNumber: text("lot_number"),
+  serialNumbers: text("serial_numbers"),
+  receiptStatus: text("receipt_status").notNull().default("pending"),
+  inspectionStatus: text("inspection_status").default("not_required"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export type ItemVendor = typeof itemVendorsTable.$inferSelect;
 export type PurchaseOrder = typeof purchaseOrdersTable.$inferSelect;
 export type PurchaseOrderLine = typeof purchaseOrderLinesTable.$inferSelect;
+export type Receipt = typeof receiptsTable.$inferSelect;
+export type ReceiptLine = typeof receiptLinesTable.$inferSelect;

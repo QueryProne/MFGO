@@ -35,16 +35,52 @@ export interface DashboardKpis {
   overdueInvoices: number; recentRevenue: number;
 }
 
+export interface CustomerAddress {
+  id: string; customerId: string; addressType: string; name?: string;
+  line1: string; line2?: string; city: string; state?: string; postalCode?: string;
+  country?: string; isDefault?: boolean; notes?: string; createdAt: string;
+}
+
+export interface CustomerContact {
+  id: string; customerId: string; firstName: string; lastName: string;
+  title?: string; department?: string; email?: string; phone?: string; mobile?: string;
+  isPrimary?: boolean; isSalesContact?: boolean; isAccountingContact?: boolean; isServiceContact?: boolean;
+  notes?: string; createdAt: string; updatedAt: string;
+}
+
 export interface Customer {
   id: string; number: string; name: string; type?: string; status: string;
-  email?: string; phone?: string; creditLimit?: string; paymentTerms?: string;
+  email?: string; phone?: string; website?: string; currency?: string;
+  creditLimit?: string; creditUsed?: string; paymentTerms?: string;
+  billingAddress?: string; shippingAddress?: string;
+  notes?: string; createdAt: string; updatedAt: string;
+  addresses?: CustomerAddress[];
+  contacts?: CustomerContact[];
+  recentOrders?: SalesOrder[];
+}
+
+export interface VendorAddress {
+  id: string; vendorId: string; addressType: string; name?: string;
+  line1: string; line2?: string; city: string; state?: string; postalCode?: string;
+  country?: string; isDefault?: boolean; notes?: string; createdAt: string;
+}
+
+export interface VendorContact {
+  id: string; vendorId: string; firstName: string; lastName: string;
+  title?: string; department?: string; email?: string; phone?: string; mobile?: string;
+  isPrimary?: boolean; isPurchasingContact?: boolean; isQualityContact?: boolean; isAccountingContact?: boolean;
   notes?: string; createdAt: string; updatedAt: string;
 }
 
 export interface Vendor {
-  id: string; number: string; name: string; status: string;
-  email?: string; phone?: string; paymentTerms?: string; leadTime?: number;
-  notes?: string; createdAt: string;
+  id: string; number: string; name: string; status: string; vendorType?: string;
+  email?: string; phone?: string; website?: string; currency?: string;
+  paymentTerms?: string; leadTime?: number; billingAddress?: string;
+  isApproved?: boolean; isPreferred?: boolean;
+  notes?: string; createdAt: string; updatedAt?: string;
+  addresses?: VendorAddress[];
+  contacts?: VendorContact[];
+  recentPOs?: PurchaseOrder[];
 }
 
 export interface Item {
@@ -91,6 +127,58 @@ export interface PurchaseOrderLine {
   mrpRecommendationId?: string;
 }
 
+export interface Receipt {
+  id: string; number: string; purchaseOrderId?: string; vendorId: string;
+  vendorName?: string; vendorNumber?: string;
+  status: string; receiptDate?: string; packingSlipNumber?: string;
+  warehouseId?: string; stockLocationId?: string;
+  inspectionRequired?: boolean; receivedBy?: string;
+  notes?: string; lineCount?: number; createdAt: string; updatedAt: string;
+  vendor?: Vendor; purchaseOrder?: PurchaseOrder; lines?: ReceiptLine[];
+}
+export interface ReceiptLine {
+  id: string; receiptId: string; purchaseOrderLineId?: string;
+  itemId: string; itemNumber?: string; itemName?: string; itemUom?: string;
+  lineNumber: number; receivedQty: string; acceptedQty: string; rejectedQty: string;
+  uom?: string; unitCost?: string; warehouseId?: string; stockLocationId?: string;
+  binId?: string; lotNumber?: string; serialNumbers?: string;
+  receiptStatus: string; inspectionStatus?: string; notes?: string; createdAt: string;
+}
+
+export interface Warehouse {
+  id: string; code: string; name: string; siteId?: string; address?: string; status: string; createdAt: string;
+}
+
+export interface StockLocation {
+  id: string; warehouseId: string; code: string; name: string;
+  locationType: string; isPickable: boolean; isPutaway: boolean; isNettable: boolean;
+  isActive: boolean; notes?: string; createdAt: string;
+}
+
+export interface Bin {
+  id: string; stockLocationId: string; warehouseId: string; code: string;
+  description?: string; binType: string; isPickable: boolean; isPutaway: boolean;
+  isNettable: boolean; maxQty?: string; isActive: boolean; createdAt: string;
+}
+
+export interface InventoryLot {
+  id: string; itemId: string; itemNumber?: string; itemName?: string;
+  lotNumber: string; status: string;
+  quantityOnHand: string; quantityAllocated: string;
+  manufactureDate?: string; receiptDate?: string; expirationDate?: string;
+  supplierLotNumber?: string; notes?: string; createdAt: string; updatedAt: string;
+}
+
+export interface InventorySerial {
+  id: string; itemId: string; itemNumber?: string; itemName?: string;
+  serialNumber: string; status: string;
+  lotId?: string; lotNumber?: string;
+  warehouseId?: string; warehouseName?: string;
+  stockLocationId?: string; binId?: string;
+  manufactureDate?: string; receiptDate?: string;
+  notes?: string; createdAt: string; updatedAt: string;
+}
+
 export interface WorkOrder {
   id: string; number: string; itemId: string; itemNumber?: string; itemName?: string;
   salesOrderId?: string; salesOrderNumber?: string; parentWorkOrderId?: string;
@@ -110,8 +198,8 @@ export interface WorkOrderOperation {
 export interface WorkOrderMaterial {
   id: string; workOrderId: string; bomLineId?: string;
   itemId: string; itemNumber?: string; itemName?: string; itemType?: string; supplyType?: string;
-  requiredQty: string; issuedQty?: string; allocatedQty?: string; shortageQty?: string;
-  supplyTypeSnapshot?: string; sourceWorkOrderId?: string; uom?: string; notes?: string;
+  requiredQty: string; issuedQty?: string; returnedQty?: string; allocatedQty?: string; shortageQty?: string;
+  issueMethod?: string; supplyTypeSnapshot?: string; sourceWorkOrderId?: string; uom?: string; notes?: string;
 }
 
 export interface ServiceOrder {
@@ -129,6 +217,7 @@ export interface ServiceOrder {
 export interface InventoryBalance {
   id: string; itemId: string; itemNumber?: string; itemName?: string;
   warehouseId: string; warehouseName?: string; location?: string;
+  stockLocationId?: string; binId?: string;
   quantityOnHand: string; quantityAllocated: string; quantityOnOrder: string;
   quantityAvailable: string; uom?: string; updatedAt: string;
 }

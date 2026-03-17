@@ -1,0 +1,397 @@
+You are updating the existing manufacturing ERP system in-place. This update must focus on inventory management, production-control inventory flow, bin/location structure, lot/serial traceability, receiving, shipping, vendor master depth, customer master depth, and seeded manufacturing examples.
+
+This is not a rewrite. Preserve the current architecture where possible and refactor surgically.
+
+==================================================
+PRIMARY OBJECTIVE
+==================================================
+
+Upgrade the system so inventory behaves as a real manufacturing inventory control system.
+
+Implement and/or strengthen:
+1. receiving
+2. shipping
+3. warehouse / stock location / bin configuration
+4. inventory detail by warehouse, location, bin, lot, and serial
+5. work-order-level inventory assignment and issue
+6. lot and serial handling at receipt, issue, completion, and shipment
+7. vendor management with CRM-like depth
+8. customer management with addresses and contacts
+9. seeded 6-level BOM manufacturing example using a go-kart
+
+==================================================
+RECEIVING
+==================================================
+
+Implement a proper receiving flow.
+
+Required data structures:
+- receipts
+- receipt_lines
+- receipt_lot_serial if needed
+- inventory_transactions
+
+Receiving must support:
+- receive against PO
+- capture packing slip
+- capture warehouse, stock location, bin
+- capture lot and serial details if item requires it
+- accept/reject quantities
+- optional inspection hold / quarantine status
+- putaway transaction path
+
+Required fields at receipt line level:
+- receiptId
+- poLineId
+- itemId
+- receivedQty
+- acceptedQty
+- rejectedQty
+- warehouseId
+- stockLocationId
+- binId
+- lotNumber nullable
+- serialNumber nullable or child records
+- receiptStatus
+- notes
+
+Inventory must not automatically become fully available if item requires inspection or is placed in hold/quarantine.
+
+==================================================
+SHIPPING
+==================================================
+
+Implement a controlled shipping flow.
+
+Required data structures:
+- shipments
+- shipment_lines
+- shipment_lot_serial if needed
+- inventory_transactions
+
+Shipping must support:
+- ship from sales order
+- partial shipments
+- pick / pack / ship lifecycle
+- assign warehouse, stock location, bin
+- assign lot / serial during shipment
+- tracking number and carrier fields
+- shipment confirmation posts inventory decrement
+
+Do not just decrement quantity without shipment transaction traceability.
+
+==================================================
+WAREHOUSE / LOCATION / BIN CONFIGURATION
+==================================================
+
+Implement warehouse hierarchy:
+
+- sites
+- warehouses
+- stock_locations
+- bins
+
+Required bin/location capabilities:
+- receiving
+- inspection
+- raw material
+- WIP
+- finished goods
+- shipping
+- quarantine
+
+Each bin/location should have:
+- code
+- description
+- warehouseId
+- type
+- isPickable
+- isPutaway
+- isNettable
+- isActive
+
+Inventory inquiries must support visibility by:
+- item
+- warehouse
+- stock location
+- bin
+- lot
+- serial
+
+==================================================
+LOT AND SERIAL CONTROL
+==================================================
+
+Strengthen item tracking controls.
+
+Item master must support:
+- trackingType: none / lot / serial
+- lotControlled boolean
+- serialControlled boolean
+- lotGenerationMode
+- serialGenerationMode
+
+Create or improve:
+- inventory_lots
+- inventory_serials
+- inventory_transaction_details
+
+Inventory movements for tracked items must preserve:
+- lot number
+- serial number
+- manufacture date if relevant
+- receipt date
+- expiration date placeholder
+- current status
+
+Track lot/serial through:
+- receipt
+- putaway
+- WO issue
+- WO completion
+- shipment
+- adjustment
+- return placeholder if applicable
+
+==================================================
+PRODUCTION CONTROL / WORK ORDER INVENTORY
+==================================================
+
+Operators must be able to interact with inventory at the WO level.
+
+Create or strengthen:
+- work_order_materials
+- work_order_material_issues
+- work_order_completions
+- work_order_completion_lot_serial
+
+Required WO inventory behaviors:
+- allocate inventory to WO
+- reserve stock
+- issue material
+- return material
+- assign lot and serial at issue time
+- complete finished goods into selected warehouse/location/bin
+- create finished lot/serial at completion if required
+- record scrap with inventory effect
+- allow controlled inventory adjustment from WO context with permission
+
+Work order material detail should show:
+- requiredQty
+- allocatedQty
+- issuedQty
+- returnedQty
+- shortageQty
+- issueMethod
+- lotSerialRequirement
+- source bin/location
+
+==================================================
+INVENTORY TRANSACTION ENGINE
+==================================================
+
+Use a ledger-style transaction model.
+
+Every inventory-affecting movement must create a transaction such as:
+- RECEIPT
+- PUTAWAY
+- ISSUE_TO_WO
+- RETURN_FROM_WO
+- COMPLETION
+- TRANSFER
+- ADJUSTMENT
+- PICK
+- SHIP
+- SCRAP
+
+Transaction fields should include:
+- transactionType
+- itemId
+- warehouseId
+- stockLocationId
+- binId
+- qty
+- uom
+- lotId nullable
+- serialId nullable
+- sourceEntityType
+- sourceEntityId
+- sourceLineId
+- performedBy
+- performedAt
+- notes
+
+==================================================
+VENDOR MANAGEMENT
+==================================================
+
+Upgrade vendor management so it mirrors CRM quality.
+
+Vendor master must include:
+- vendor code
+- vendor name
+- status
+- vendor type
+- payment terms
+- tax ID placeholder
+- currency placeholder
+- default buyer
+- approved vendor flag
+- preferred vendor flag
+
+Vendor addresses must support multiple rows:
+- remit-to
+- PO address
+- return-to
+- main office
+- ship-from
+
+Vendor contacts must support:
+- firstName
+- lastName
+- title
+- department
+- email
+- phone
+- mobile
+- primaryContact
+- purchasingContact
+- qualityContact
+- accountingContact
+
+Vendor pages should show:
+- addresses
+- contacts
+- item-vendor assignments
+- PO history
+- open POs
+- performance placeholder
+
+==================================================
+CUSTOMER MANAGEMENT
+==================================================
+
+Customer records must support proper address and contact detail.
+
+Add or strengthen:
+- customer_addresses
+- customer_contacts
+
+Address types:
+- bill-to
+- ship-to
+- remit-to
+- main office
+- service site
+
+Contact fields:
+- firstName
+- lastName
+- title
+- department
+- email
+- phone
+- mobile
+- primaryContact
+- salesContact
+- accountingContact
+- serviceContact
+
+Customer pages should expose:
+- addresses
+- contacts
+- quotes
+- sales orders
+- shipments
+- service orders
+
+==================================================
+SEEDED 6-LEVEL BOM EXAMPLE
+==================================================
+
+Seed a realistic multi-level manufacturing example based on a go-kart.
+
+Top-level item:
+- GO-KART-1000
+
+Seed approximately 6 BOM levels including:
+- frame
+- powertrain
+- steering
+- brake system
+- wheel assembly
+- electrical
+- seat
+- body kit
+- deep nested fastener/subcomponent levels
+
+Also seed examples for:
+- purchased parts
+- manufactured parts
+- stocked subassemblies
+- order-built subassemblies
+- phantom items
+- lot-controlled items
+- serial-controlled items
+
+==================================================
+SEEDED MASTER DATA
+==================================================
+
+Seed:
+- multiple vendors with addresses and contacts
+- multiple customers with addresses and contacts
+- item-vendor relationships
+- example POs
+- example receipts
+- example shipments
+- example work order with issued material
+- example lot/serial inventory
+
+==================================================
+PERMISSIONS AND AUDIT
+==================================================
+
+Ensure sensitive inventory actions require permissions.
+
+Example permissions:
+- inventory.receive
+- inventory.putaway
+- inventory.ship
+- inventory.adjust
+- inventory.issue_to_wo
+- inventory.complete_wo
+- vendor.edit
+- customer.edit
+
+Every critical action must create audit logs.
+
+==================================================
+IMPLEMENTATION ORDER
+==================================================
+
+1. inspect current schema and inventory-related routes
+2. add migrations for warehouse/location/bin and inventory tracking tables
+3. implement receiving flow
+4. implement shipping flow
+5. implement lot/serial structures
+6. implement WO inventory assignment and issue/completion logic
+7. extend vendor management
+8. extend customer contacts/addresses
+9. add seeded go-kart BOM and related sample data
+10. verify end-to-end inventory traceability
+
+==================================================
+ACCEPTANCE CRITERIA
+==================================================
+
+The update is complete only when:
+- receipts can be entered and traced
+- shipments can be created and traced
+- inventory is visible by warehouse/location/bin
+- lot and serial control works end-to-end
+- WO material issue and completion update inventory correctly
+- vendors have addresses and contacts
+- customers have addresses and contacts
+- seeded go-kart BOM demonstrates deep multi-level manufacturing structure
+- all critical inventory actions are auditable

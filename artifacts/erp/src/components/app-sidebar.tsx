@@ -1,8 +1,8 @@
 import { Link, useLocation } from "wouter";
-import { 
+import {
   LayoutDashboard, Users, ShoppingCart, Package, Wrench,
   Boxes, Truck, FileText, CheckSquare, Database, Settings,
-  Factory, BarChart3, Layers, Headphones,
+  Factory, BarChart3, Layers, Headphones, PackageCheck, Building2,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -14,7 +14,8 @@ const navGroups = [
     label: "Core",
     items: [
       { title: "Dashboard", url: "/", icon: LayoutDashboard },
-      { title: "CRM", url: "/customers", icon: Users },
+      { title: "Customers", url: "/customers", icon: Users },
+      { title: "Vendors", url: "/vendors", icon: Building2 },
       { title: "Sales Orders", url: "/salesorders", icon: ShoppingCart },
     ]
   },
@@ -23,6 +24,7 @@ const navGroups = [
     items: [
       { title: "Workbench", url: "/planning", icon: BarChart3 },
       { title: "Purchase Orders", url: "/purchaseorders", icon: Package },
+      { title: "Receiving", url: "/receiving", icon: PackageCheck },
     ]
   },
   {
@@ -72,7 +74,7 @@ export function AppSidebar() {
           <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Enterprise ERP</span>
         </div>
       </SidebarHeader>
-      
+
       <SidebarContent className="px-2 scrollbar-none">
         {navGroups.map((group) => (
           <SidebarGroup key={group.label} className="mt-1">
@@ -85,8 +87,8 @@ export function AppSidebar() {
                   const isActive = location === item.url || (item.url !== "/" && location.startsWith(item.url));
                   return (
                     <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton 
-                        asChild 
+                      <SidebarMenuButton
+                        asChild
                         isActive={isActive}
                         className={`
                           transition-all duration-200 group rounded-lg h-8 my-[1px]

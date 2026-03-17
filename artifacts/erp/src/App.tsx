@@ -12,6 +12,8 @@ import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import CustomersList from "@/pages/crm/customers";
 import CustomerDetail from "@/pages/crm/customers/detail";
+import VendorsList from "@/pages/crm/vendors";
+import VendorDetail from "@/pages/crm/vendors/detail";
 import ItemsList from "@/pages/inventory/items";
 import ItemDetail from "@/pages/inventory/items/detail";
 import SalesOrdersList from "@/pages/sales/orders";
@@ -24,6 +26,8 @@ import InvoicingPage from "@/pages/invoicing";
 import QualityPage from "@/pages/quality";
 import PlanningPage from "@/pages/planning";
 import ServiceOrdersPage from "@/pages/service-orders";
+import ReceivingPage from "@/pages/receiving";
+import ReceiptDetail from "@/pages/receiving/detail";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,11 +53,15 @@ function Router() {
       {/* CRM */}
       <Route path="/customers" component={CustomersList} />
       <Route path="/customers/:id" component={CustomerDetail} />
+      <Route path="/vendors" component={VendorsList} />
+      <Route path="/vendors/:id" component={VendorDetail} />
       {/* Sales */}
       <Route path="/salesorders" component={SalesOrdersList} />
       {/* Planning & Purchasing */}
       <Route path="/planning" component={PlanningPage} />
       <Route path="/purchaseorders" component={PurchaseOrdersPage} />
+      <Route path="/receiving" component={ReceivingPage} />
+      <Route path="/receiving/:id" component={ReceiptDetail} />
       {/* Engineering */}
       <Route path="/items" component={ItemsList} />
       <Route path="/items/:id" component={ItemDetail} />
