@@ -1,8 +1,12 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { quotesTable, quoteLinesTable, salesOrdersTable, salesOrderLinesTable, itemsTable, customersTable } from "@workspace/db";
+import {
+  quotesTable, quoteLinesTable, salesOrdersTable, salesOrderLinesTable, itemsTable,
+  customersTable, workOrdersTable, serviceOrdersTable, bomsTable,
+} from "@workspace/db";
 import { eq, ilike, or, sql, and } from "drizzle-orm";
 import { getNextNumber } from "../lib/counter";
+import { auditLog } from "../lib/audit";
 
 const router = Router();
 
@@ -219,6 +223,85 @@ router.put("/salesorders/:id", async (req, res) => {
     await db.update(salesOrdersTable).set({ ...req.body, updatedAt: new Date() }).where(eq(salesOrdersTable.id, req.params.id));
     const result = await getSalesOrderWithLines(req.params.id);
     res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: "error", message: String(e) });
+  }
+});
+
+// SALES ORDER CONVERSION (convert lines to work orders / service orders)
+router.post("/salesorders/:id/convert-to-downstream", async (req, res) => {
+  try {
+    const { lineConversions, warehouseId } = req.body;
+    // lineConversions: [{ salesOrderLineId, mode: 'work_order'|'service_order'|'both'|'none' }]
+
+    const so = await getSalesOrderWithLines(req.params.id);
+    if (!so) return res.status(404).json({ error: "not_found", message: "Sales order not found" });
+
+    const results: any[] = [];
+
+    for (const conv of (lineConversions ?? [])) {
+      const line = so.lines.find((l: any) => l.id === conv.salesOrderLineId);
+      if (!line || conv.mode === "none") continue;
+
+      const item = await db.select().from(itemsTable).where(eq(itemsTable.id, line.itemId)).limit(1);
+      const itm = item[0];
+      if (!itm) continue;
+
+      const createWO = conv.mode === "work_order" || conv.mode === "both"
+        || (conv.mode === undefined && itm.supplyType === "manufactured");
+      const createSVC = conv.mode === "service_order" || conv.mode === "both"
+        || (conv.mode === undefined && itm.supplyType === "service");
+
+      if (createWO) {
+        // Find BOM
+        const bom = await db.select().from(bomsTable)
+          .where(and(eq(bomsTable.itemId, line.itemId), eq(bomsTable.status, "active"))).limit(1);
+
+        const wo = await db.insert(workOrdersTable).values({
+          number: getNextNumber("WO"),
+          itemId: line.itemId,
+          bomId: bom[0]?.id ?? null,
+          salesOrderId: req.params.id,
+          salesOrderLineId: line.id,
+          status: "draft",
+          type: "standard",
+          quantityOrdered: line.quantity,
+          scheduledEnd: line.requestedDate ?? line.promisedDate,
+          warehouseId: warehouseId ?? null,
+          priority: "normal",
+          notes: `Converted from ${so.number} line ${line.lineNumber}`,
+        }).returning();
+
+        await auditLog({ entity: "work_order", entityId: wo[0].id, action: "create",
+          fieldChanges: { source: "so_conversion", salesOrderId: req.params.id, salesOrderLineId: line.id } }, req);
+
+        results.push({ type: "work_order", lineId: line.id, record: wo[0] });
+      }
+
+      if (createSVC) {
+        const svc = await db.insert(serviceOrdersTable).values({
+          number: getNextNumber("SVC"),
+          salesOrderId: req.params.id,
+          salesOrderLineId: line.id,
+          customerId: so.customerId,
+          itemId: line.itemId,
+          serviceType: "standard",
+          status: "draft",
+          requestedDate: line.requestedDate,
+          notes: `Converted from ${so.number} line ${line.lineNumber}`,
+        }).returning();
+
+        await auditLog({ entity: "service_order", entityId: svc[0].id, action: "create",
+          fieldChanges: { source: "so_conversion", salesOrderId: req.params.id, salesOrderLineId: line.id } }, req);
+
+        results.push({ type: "service_order", lineId: line.id, record: svc[0] });
+      }
+    }
+
+    await auditLog({ entity: "sales_order", entityId: req.params.id, action: "convert",
+      fieldChanges: { convertedLines: results.length, results: results.map(r => ({ type: r.type, number: r.record.number })) } }, req);
+
+    res.status(201).json({ salesOrderId: req.params.id, results });
   } catch (e) {
     res.status(500).json({ error: "error", message: String(e) });
   }

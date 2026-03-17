@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, numeric, integer, date } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, numeric, integer, date, boolean } from "drizzle-orm/pg-core";
 import { itemsTable } from "./items";
 
 export const workcentersTable = pgTable("workcenters", {
@@ -33,7 +33,13 @@ export const bomLinesTable = pgTable("bom_lines", {
   itemId: text("item_id").notNull().references(() => itemsTable.id),
   quantity: numeric("quantity", { precision: 15, scale: 6 }).notNull(),
   uom: text("uom").default("EA"),
+  lineType: text("line_type").notNull().default("standard"),
+  componentIssuePolicy: text("component_issue_policy").default("push"),
   scrapFactor: numeric("scrap_factor", { precision: 5, scale: 4 }).default("0"),
+  effectiveFrom: date("effective_from"),
+  effectiveTo: date("effective_to"),
+  isPhantom: boolean("is_phantom").default(false),
+  referenceNotes: text("reference_notes"),
   notes: text("notes"),
 });
 

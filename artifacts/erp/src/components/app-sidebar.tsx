@@ -1,28 +1,12 @@
 import { Link, useLocation } from "wouter";
 import { 
-  LayoutDashboard, 
-  Users, 
-  ShoppingCart, 
-  Package, 
-  Wrench, 
-  Boxes, 
-  Truck, 
-  FileText, 
-  CheckSquare, 
-  LineChart, 
-  Database, 
-  Settings 
+  LayoutDashboard, Users, ShoppingCart, Package, Wrench,
+  Boxes, Truck, FileText, CheckSquare, Database, Settings,
+  Factory, BarChart3, Layers, Headphones,
 } from "lucide-react";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarHeader,
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
+  SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader,
 } from "@/components/ui/sidebar";
 
 const navGroups = [
@@ -31,17 +15,29 @@ const navGroups = [
     items: [
       { title: "Dashboard", url: "/", icon: LayoutDashboard },
       { title: "CRM", url: "/customers", icon: Users },
-      { title: "Sales", url: "/salesorders", icon: ShoppingCart },
-      { title: "Purchasing", url: "/purchaseorders", icon: Package },
+      { title: "Sales Orders", url: "/salesorders", icon: ShoppingCart },
     ]
   },
   {
-    label: "Manufacturing",
+    label: "Planning & Purchasing",
+    items: [
+      { title: "Workbench", url: "/planning", icon: BarChart3 },
+      { title: "Purchase Orders", url: "/purchaseorders", icon: Package },
+    ]
+  },
+  {
+    label: "Engineering",
     items: [
       { title: "Item Master", url: "/items", icon: Boxes },
-      { title: "Engineering", url: "/boms", icon: Wrench },
-      { title: "Production", url: "/workorders", icon: Settings },
-      { title: "MRP & Planning", url: "/mrp", icon: LineChart },
+      { title: "Bills of Material", url: "/boms", icon: Layers },
+      { title: "Work Centers", url: "/workcenters", icon: Factory },
+    ]
+  },
+  {
+    label: "Production",
+    items: [
+      { title: "Work Orders", url: "/workorders", icon: Wrench },
+      { title: "Service Orders", url: "/serviceorders", icon: Headphones },
     ]
   },
   {
@@ -79,8 +75,8 @@ export function AppSidebar() {
       
       <SidebarContent className="px-2 scrollbar-none">
         {navGroups.map((group) => (
-          <SidebarGroup key={group.label} className="mt-2">
-            <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground/70 font-semibold px-3 mb-1">
+          <SidebarGroup key={group.label} className="mt-1">
+            <SidebarGroupLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-semibold px-3 mb-1">
               {group.label}
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -93,12 +89,12 @@ export function AppSidebar() {
                         asChild 
                         isActive={isActive}
                         className={`
-                          transition-all duration-200 group rounded-lg h-9 my-[1px]
+                          transition-all duration-200 group rounded-lg h-8 my-[1px]
                           ${isActive ? 'bg-primary/10 text-primary font-medium border border-primary/20 shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-secondary/80'}
                         `}
                       >
                         <Link href={item.url} className="flex items-center gap-3 px-3">
-                          <item.icon className={`w-4 h-4 transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`} />
+                          <item.icon className={`w-3.5 h-3.5 flex-shrink-0 transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`} />
                           <span className="text-sm">{item.title}</span>
                         </Link>
                       </SidebarMenuButton>

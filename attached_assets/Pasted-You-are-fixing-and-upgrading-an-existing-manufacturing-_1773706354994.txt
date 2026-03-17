@@ -1,0 +1,475 @@
+You are fixing and upgrading an existing manufacturing ERP codebase.
+
+This is not a greenfield build. You must preserve the current project structure where reasonable, but refactor the schema, API, services, and UI to support proper industrial manufacturing workflows.
+
+==================================================
+PRIMARY GOAL
+==================================================
+
+Refactor the current ERP so that:
+
+1. MRP / Planning and Purchasing operate as one integrated module and one operational workbench
+2. BOM management supports creating new parts directly from the BOM workflow
+3. Parts can be assigned one or more vendors with purchase-level controls
+4. Lead times and safety stock are managed at the item-vendor purchasing level
+5. Work orders are created from sales orders through a controlled conversion flow
+6. Subassemblies are properly supported for shop floor and production planning
+7. Sales order conversion supports both manufacturing work orders and service orders
+8. Permissions and audit/change tracking are strengthened across all critical actions
+
+Do not patch superficially. Make the architecture correct.
+
+==================================================
+CURRENT KNOWN GAPS TO FIX
+==================================================
+
+The existing codebase currently has these problems:
+- MRP/planning and purchasing are split into separate modules and routes
+- item purchasing fields are too generic and live only on the item master
+- no item-vendor purchasing table exists
+- BOM lines only select existing items and cannot create new parts inline
+- no subassembly policy exists
+- work orders link to sales orders, but there is no robust sales-order-to-work-order conversion service
+- no service order entity exists
+- audit logging exists but is not consistently enforced
+- permissions exist only as a simple role JSON array and need stronger enforcement patterns
+
+==================================================
+ARCHITECTURE DECISIONS
+==================================================
+
+Keep:
+- React frontend
+- Express backend
+- Drizzle ORM
+- PostgreSQL
+- current modular route structure as a base
+
+Refactor toward:
+- domain services for planning, purchasing, BOM, and production conversion
+- shared transaction-safe service functions
+- stronger audit logging wrapper for all create/update/convert/release actions
+- permission guards by module + action
+
+==================================================
+MODULE CHANGE 1: PLANNING & PURCHASING IN ONE
+==================================================
+
+Create a unified functional module called:
+- Planning & Purchasing
+
+Keep the backend tables logically separate where needed, but expose one integrated workflow.
+
+Required backend/service changes:
+- create a PlannerBuyerWorkbench service
+- create a unified endpoint group such as:
+  - /api/planning-purchasing/workbench
+  - /api/planning-purchasing/recommendations
+  - /api/planning-purchasing/release
+  - /api/planning-purchasing/exceptions
+- merge MRP recommendations and purchasing actions into one workbench result set
+- allow a recommendation to be released into:
+  - purchase order
+  - purchase requisition placeholder if useful
+  - work order
+  - transfer suggestion placeholder
+
+Workbench must show:
+- item
+- demand source
+- recommendation type
+- vendor / preferred vendor
+- suggested qty
+- need date
+- lead time
+- shortage qty
+- current on hand
+- on order
+- open supply
+- priority
+- release status
+- exception message
+
+Frontend changes:
+- replace separate “MRP” and “Purchasing” top-level planning actions with a combined Planner/Buyer view
+- still keep purchase order screens, but link them from the new workbench
+
+==================================================
+MODULE CHANGE 2: ITEM-VENDOR PURCHASING CONTROL
+==================================================
+
+Add a new table:
+- item_vendors
+
+Schema requirements:
+- id
+- itemId
+- vendorId
+- vendorPartNumber
+- isPreferred
+- isApproved
+- leadTimeDays
+- minOrderQty
+- orderMultiple
+- purchaseUom
+- uomConversionToStock
+- safetyStockQty
+- reorderPointQty
+- lastCost
+- standardCost
+- effectiveFrom
+- effectiveTo
+- notes
+- createdAt
+- updatedAt
+
+Rules:
+- one item can have many vendors
+- one preferred vendor per item at a time
+- MRP planned PO suggestions must use preferred approved vendor when present
+- if no preferred vendor exists, recommendation should be flagged as exception
+- move purchasing logic away from item.leadTime and item.safetyStock where applicable
+- item-level lead time and safety stock can remain as default fallback values only
+
+API changes:
+- add CRUD endpoints for item vendor assignments
+- include vendor purchasing data on item detail
+- include preferred vendor data in MRP/planning results
+
+Frontend changes:
+- add Purchasing tab to item detail
+- allow assigning vendors, lead times, MOQ, safety stock, reorder point, and purchase UOM
+
+==================================================
+MODULE CHANGE 3: BOM MANAGEMENT WITH INLINE PART CREATION
+==================================================
+
+Upgrade BOM management so users can create a new part while editing a BOM.
+
+Required behavior:
+- in BOM line entry, support:
+  - select existing part
+  - quick-create purchased part
+  - quick-create manufactured part
+  - quick-create subassembly
+- after creation, automatically link the new part to the BOM line
+
+Quick-create fields:
+- part number
+- description
+- item type
+- make/buy
+- UOM
+- revision
+- default vendor if purchased
+- lead time
+- safety stock
+- reorder point
+- lot/serial tracking
+- status
+
+Also add BOM best-practice fields:
+- line type
+- component issue policy
+- substitute/alternate part placeholder
+- scrap factor
+- effective from / effective to
+- reference notes
+
+==================================================
+MODULE CHANGE 4: SUBASSEMBLY MANAGEMENT
+==================================================
+
+Add explicit subassembly policy support.
+
+At the item level add:
+- supplyType or fulfillmentPolicy with values:
+  - purchased
+  - manufactured
+  - subassembly_stocked
+  - subassembly_order_built
+  - phantom
+  - service
+
+At the BOM / work order explosion level:
+- phantom components explode directly into parent material requirements
+- stocked subassemblies consume inventory first
+- order-built subassemblies generate child work orders
+- purchased components create purchasing demand
+- service items do not create manufacturing demand
+
+Add work order materials table:
+- work_order_materials
+Fields:
+- id
+- workOrderId
+- bomLineId
+- itemId
+- requiredQty
+- issuedQty
+- allocatedQty
+- shortageQty
+- supplyTypeSnapshot
+- sourceWorkOrderId nullable
+- notes
+
+When creating a WO from a sales order:
+- explode BOM
+- inspect each component
+- create child WO for order-built subassemblies
+- explode phantom parts into parent WO materials
+- create shortages/recommendations for purchased items if inventory is short
+
+==================================================
+MODULE CHANGE 5: SALES ORDER TO WORK ORDER / SERVICE ORDER CONVERSION
+==================================================
+
+Create a formal conversion service from sales orders.
+
+Add endpoint:
+- POST /api/salesorders/:id/convert-to-downstream
+
+Payload options:
+- selected line ids
+- conversion mode per line:
+  - work_order
+  - service_order
+  - both
+  - none
+- warehouse/site
+- requested scheduling options
+
+Create new entity:
+- service_orders
+
+Suggested schema:
+- id
+- number
+- salesOrderId
+- salesOrderLineId
+- customerId
+- itemId nullable
+- serviceType
+- status
+- requestedDate
+- scheduledDate
+- completionDate
+- customerSite
+- assetReference
+- plannedHours
+- actualHours
+- notes
+- createdAt
+- updatedAt
+
+Conversion rules:
+- manufactured / subassembly order-built items default to work_order
+- service items default to service_order
+- hybrid sales lines can create both
+- resulting records must retain traceability back to sales order and line
+
+Also add:
+- work order creation from sales order line
+- child work order creation for subassemblies
+- service order creation option during conversion
+- audit log entries for conversion actions
+
+==================================================
+MODULE CHANGE 6: MRP / PLANNING LOGIC IMPROVEMENTS
+==================================================
+
+Upgrade the simplistic MRP engine.
+
+Required logic:
+- demand inputs:
+  - sales order lines
+  - work order component demand
+  - safety stock / reorder signals
+- supply inputs:
+  - inventory balances
+  - open purchase orders
+  - open work orders
+- recommendation outputs:
+  - planned_po
+  - planned_wo
+  - shortage
+  - vendor_missing
+  - reschedule_in placeholder
+  - reschedule_out placeholder
+
+Rules:
+- purchased demand should use item-vendor lead time
+- manufactured demand should consider routing/BOM existence
+- service items should not create manufacturing recommendations
+- subassembly items should create WO or inventory pull depending on policy
+- recommendations should store pegging context where possible:
+  - salesOrderId
+  - salesOrderLineId
+  - parentWorkOrderId
+
+==================================================
+MODULE CHANGE 7: PERMISSIONS AND CHANGE TRACKING
+==================================================
+
+Strengthen administration management.
+
+Permissions:
+- introduce permission names by module and action, such as:
+  - planning.view
+  - planning.release
+  - purchasing.view
+  - purchasing.create_po
+  - bom.edit
+  - workorder.create
+  - serviceorder.create
+  - admin.manage_permissions
+- add middleware helpers for permission checks
+- protect all critical create/update/release/convert endpoints
+
+Audit/change tracking:
+- ensure all critical mutations call audit logging
+- log:
+  - entity
+  - entityId
+  - action
+  - userId
+  - before
+  - after
+  - fieldChanges
+  - source
+- add audit entries for:
+  - item creation
+  - vendor assignment changes
+  - BOM edits
+  - sales order conversion
+  - work order creation
+  - service order creation
+  - recommendation release
+  - permission changes
+
+==================================================
+DATABASE CHANGES TO IMPLEMENT
+==================================================
+
+Update schema to include at minimum:
+- item_vendors
+- service_orders
+- work_order_materials
+
+Update existing tables as needed:
+- items
+  - add makeBuy or supplyType
+  - preserve current data where possible
+- mrp_recommendations
+  - add salesOrderId nullable
+  - add salesOrderLineId nullable
+  - add parentWorkOrderId nullable
+  - add vendorException fields if useful
+- work_orders
+  - improve type handling and linkage
+- bom_lines
+  - add effective dates and component handling fields where reasonable
+
+Create migrations carefully. Do not destroy existing seed/demo data unless necessary; migrate it.
+
+==================================================
+FRONTEND CHANGES TO IMPLEMENT
+==================================================
+
+1. Item detail
+- add Purchasing tab
+- add vendor assignment grid
+- add preferred vendor indicator
+- add purchase safety stock / lead time UI
+
+2. BOM editor
+- add inline “Create Part” action
+- add quick-create modal/drawer
+- support create purchased / manufactured / subassembly parts
+- return new item to BOM line immediately
+
+3. Planning & Purchasing workbench
+- combined shortages, recommendations, and purchasing release actions
+- filters by:
+  - item
+  - vendor
+  - recommendation type
+  - due date
+  - priority
+  - planner/buyer
+- row actions:
+  - release PO
+  - create WO
+  - open item
+  - open demand source
+
+4. Sales order detail
+- add Convert action
+- allow per-line choice:
+  - create work order
+  - create service order
+  - create both
+
+5. Work order detail
+- add materials tab
+- show shortage, allocation, and child WO relationships
+
+6. Add service order pages
+- list
+- detail
+- create/edit if needed
+
+==================================================
+BEST PRACTICE BEHAVIOR TO FOLLOW
+==================================================
+
+Implement according to industrial manufacturing best practices:
+
+- purchasing control is item-vendor specific
+- subassemblies are real supply objects
+- phantoms explode into parent demand
+- order-built subassemblies generate child WOs
+- work orders originate from sales demand through controlled conversion
+- service demand can be generated alongside production demand
+- planning and purchasing operate from one workbench
+- auditability and traceability are mandatory
+
+==================================================
+IMPLEMENTATION ORDER
+==================================================
+
+1. Add schema changes and migrations
+2. Add backend domain services:
+   - item vendor service
+   - BOM quick-create service
+   - sales order conversion service
+   - planning/purchasing workbench service
+3. Refactor MRP recommendation logic
+4. Add new routes and permission guards
+5. Add audit logging coverage
+6. Update frontend pages
+7. Update seed data with:
+   - multiple vendors per item
+   - one preferred vendor
+   - one subassembly example
+   - one sales order convertible to WO
+   - one sales order convertible to service order
+8. Verify end-to-end flows
+
+==================================================
+ACCEPTANCE CRITERIA
+==================================================
+
+The implementation is complete only when:
+
+- Planning & Purchasing is presented as one integrated workbench
+- items can have vendor-specific purchasing settings
+- BOM editor can create new parts inline
+- subassemblies can create child work orders
+- sales orders can convert to work orders
+- sales orders can optionally create service orders
+- audit logs record these changes
+- permission checks protect these actions
+- demo seed data proves these flows work
+
+Begin by analyzing the current schema and routes, then implement the required schema changes and backend services first.

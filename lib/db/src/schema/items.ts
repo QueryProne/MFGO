@@ -8,6 +8,8 @@ export const itemsTable = pgTable("items", {
   name: text("name").notNull(),
   description: text("description"),
   type: text("type").notNull(),
+  supplyType: text("supply_type").notNull().default("purchased"),
+  makeBuy: text("make_buy").notNull().default("buy"),
   status: text("status").notNull().default("active"),
   uom: text("uom").default("EA"),
   category: text("category"),

@@ -7,38 +7,43 @@ Full-stack manufacturing ERP for small-to-medium manufacturers. Enterprise dark-
 - **Frontend**: React + Vite (artifact `erp`, port from `PORT` env, previewPath `/`)
 - **Backend**: Express 5 API server (artifact `api-server`, port 8080)
 - **Database**: PostgreSQL via Drizzle ORM (`lib/db`)
-- **API Client**: Auto-generated React Query hooks (`lib/api-client-react`) + custom `api.ts` client
+- **API Client**: Custom typed `api.ts` with React Query throughout
 
 ## Modules
 | Module | Route | Status |
 |---|---|---|
 | Dashboard | `/` | ✅ Live KPIs from DB |
-| CRM / Customers | `/customers` | ✅ Full CRUD |
-| Sales Orders | `/salesorders` | ✅ Full CRUD |
+| CRM / Customers | `/customers`, `/customers/:id` | ✅ Full CRUD + detail |
+| Sales Orders | `/salesorders` | ✅ Full CRUD + SO→WO conversion |
+| Planning & Purchasing Workbench | `/planning` | ✅ MRP + shortage analysis + release |
 | Purchase Orders | `/purchaseorders` | ✅ Full CRUD |
-| Item Master | `/items` | ✅ Full CRUD |
+| Item Master | `/items`, `/items/:id` | ✅ Full CRUD + vendor/purchasing tab |
+| Bills of Material | `/boms` | ✅ API complete, frontend placeholder |
+| Work Centers | `/workcenters` | Placeholder |
+| Work Orders | `/workorders`, `/workorders/:id` | ✅ Detail with materials + operations |
+| Service Orders | `/serviceorders` | ✅ List + SO conversion |
 | Inventory | `/inventory` | ✅ Real-time balances |
-| Work Orders | `/workorders` | ✅ Progress tracking |
 | Shipping | `/shipments` | ✅ Full CRUD |
 | Invoicing | `/invoices` | ✅ A/R tracking |
-| Quality (Inspections + NCR) | `/quality` | ✅ Full CRUD |
-| MRP & Planning | `/mrp` | ✅ Engine + runs |
-| BOM / Routing | via API | ✅ Routes + models |
+| Quality | `/quality` | ✅ Inspections + NCR |
 
 ## Backend API Routes
 All routes mount at `/api/*`:
-- `/api/auth/me` — current user (static for now)
+- `/api/auth/me` — current user session
 - `/api/dashboard/kpis` — aggregate metrics
 - `/api/customers`, `/api/vendors`, `/api/contacts`
-- `/api/items`, `/api/boms`, `/api/routings`, `/api/workcenters`
+- `/api/items` — CRUD + `/api/items/:id/vendors` (ItemVendor CRUD)
+- `/api/boms`, `/api/boms/:id/lines` (inline item creation)
+- `/api/routings`, `/api/workcenters`
 - `/api/inventory`, `/api/inventory/transactions`, `/api/inventory/warehouses`
-- `/api/quotes`, `/api/salesorders`
+- `/api/quotes`, `/api/salesorders`, `/api/salesorders/:id/convert-to-downstream`
 - `/api/purchaseorders` (with `/receive` endpoint)
-- `/api/workorders` (with `/complete` endpoint)
+- `/api/workorders`, `/api/workorders/:id/materials`
+- `/api/serviceorders`
 - `/api/shipments`, `/api/invoices`
 - `/api/quality/inspections`, `/api/quality/nonconformances`
 - `/api/mrp/runs`, `/api/mrp/recommendations`
-- `/api/planning/scenarios`
+- `/api/planning-purchasing/workbench`, `/api/planning-purchasing/release`, `/api/planning-purchasing/exceptions`
 - `/api/search` — global cross-entity search
 - `/api/smarttransfer/jobs`, `/api/smarttransfer/mappings`
 - `/api/roles`, `/api/users`
@@ -46,37 +51,38 @@ All routes mount at `/api/*`:
 ## Database Schema (lib/db/src/schema/)
 - `users.ts` — users, roles
 - `crm.ts` — customers, vendors, contacts
-- `items.ts` — items master
-- `engineering.ts` — boms, bom_lines, routings, routing_operations, workcenters
+- `items.ts` — items master (supplyType, makeBuy fields)
+- `engineering.ts` — boms (revision/status/effectivity), bom_lines (lineType/issuePolicy/phantom), routings, routing_operations, workcenters
 - `inventory.ts` — warehouses, inventory_balances, inventory_transactions
 - `sales.ts` — quotes, quote_lines, sales_orders, sales_order_lines
-- `purchasing.ts` — purchase_orders, purchase_order_lines
-- `production.ts` — work_orders, work_order_operations
+- `purchasing.ts` — purchase_orders, purchase_order_lines, **item_vendors** (new)
+- `production.ts` — work_orders (salesOrderId, parentWorkOrderId pegging), work_order_operations, **work_order_materials** (new), **service_orders** (new)
 - `shipping.ts` — shipments, shipment_lines
-- `invoices.ts` — invoices, invoice_lines (within shipping.ts)
+- `invoices.ts` — invoices, invoice_lines
 - `quality.ts` — inspections, nonconformances
-- `planning.ts` — mrp_runs, mrp_recommendations, planning_scenarios, smart_transfer_jobs, smart_transfer_mappings
+- `planning.ts` — mrp_runs, mrp_recommendations (with pegging/vendor fields), planning_scenarios
 - `audit.ts` — audit_logs
-- `dashboard.ts` — dashboard_widgets (within audit.ts or planning.ts)
 
-## Demo Data
-Seeded on first startup via `artifacts/api-server/src/lib/seed.ts`:
-- 3 customers (Acme Industrial, BuildRight, Precision Dynamics)
-- 2 vendors (SteelCo Materials, FastFab Components)
-- 5 items (2 raw materials, 2 manufactured, 1 finished good)
-- 1 BOM + routing with 3 operations
-- 5 inventory balances
-- 3 sales orders (SO-1001 to SO-1003)
-- 1 purchase order (PO-1001)
-- 2 work orders (WO-1001 released, WO-1002 in progress at 48%)
-- 1 shipment (SHP-1001 shipped via UPS Freight)
-- 1 invoice (INV-1001 sent, $16,848 outstanding)
-- 2 quality inspections + 1 NCR
+## Key Business Logic
+- **Item Vendor Model**: `item_vendors` table — one item, many vendors, preferred/approved flags. MRP uses preferred approved vendor lead time; raises vendor exception if none found.
+- **Supply Types**: `purchased`, `manufactured`, `subassembly_stocked`, `subassembly_order_built`, `phantom`, `service`
+- **SO Conversion**: `POST /api/salesorders/:id/convert-to-downstream` creates WOs/SVCs based on item supply type
+- **MRP Engine**: Time-aware, demand-pegged, produces `planned_po`/`planned_wo`/`shortage`/`vendor_missing` recommendations with full supply/demand analysis
+- **Work Order Materials**: BOM explosion with subassembly policy evaluation, shortage analysis
 
 ## Design System
 - Enterprise dark mode (dark bg ~#0a0a0f)
-- Sidebar navigation with grouped modules
+- Sidebar navigation with grouped modules: Core / Planning & Purchasing / Engineering / Production / Fulfillment / System
 - Dense table views with color-coded status badges
 - Recharts for metrics visualization
-- Framer Motion for page transitions
 - shadcn/ui components throughout
+
+## Demo Data
+Seeded on first startup via `artifacts/api-server/src/lib/seed.ts`:
+- 3 customers, 2 vendors, 5 items (with supply types + item_vendor records)
+- 1 BOM + routing with 3 operations
+- 5 inventory balances (with allocated/available calculations)
+- 3 sales orders, 1 purchase order
+- 2 work orders (WO-1001 released, WO-1002 in progress at 48%)
+- 1 shipment, 1 invoice, 2 inspections, 1 NCR
+- MRP run with planning recommendations

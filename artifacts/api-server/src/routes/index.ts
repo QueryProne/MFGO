@@ -10,7 +10,7 @@ import purchasingRouter from "./purchasing";
 import productionRouter from "./production";
 import shippingRouter from "./shipping";
 import qualityRouter from "./quality";
-import mrpRouter from "./mrp";
+import planningPurchasingRouter from "./planning-purchasing";
 import dashboardRouter from "./dashboard";
 import searchRouter from "./search";
 import smartTransferRouter from "./smarttransfer";
@@ -29,6 +29,7 @@ router.get("/auth/me", (req, res) => {
     roleId: "admin",
     roleName: "System Administrator",
     department: "IT",
+    permissions: ["*"],
     createdAt: new Date().toISOString(),
   });
 });
@@ -44,7 +45,7 @@ router.use(purchasingRouter);
 router.use(productionRouter);
 router.use(shippingRouter);
 router.use(qualityRouter);
-router.use(mrpRouter);
+router.use(planningPurchasingRouter);
 router.use(dashboardRouter);
 router.use(searchRouter);
 router.use(smartTransferRouter);

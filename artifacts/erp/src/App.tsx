@@ -13,30 +13,30 @@ import Dashboard from "@/pages/dashboard";
 import CustomersList from "@/pages/crm/customers";
 import CustomerDetail from "@/pages/crm/customers/detail";
 import ItemsList from "@/pages/inventory/items";
+import ItemDetail from "@/pages/inventory/items/detail";
 import SalesOrdersList from "@/pages/sales/orders";
 import WorkOrdersList from "@/pages/production/work-orders";
-import MrpDashboard from "@/pages/mrp/mrp-dashboard";
+import WorkOrderDetail from "@/pages/production/work-orders/detail";
 import PurchaseOrdersPage from "@/pages/purchasing";
 import InventoryPage from "@/pages/inventory";
 import ShippingPage from "@/pages/shipping";
 import InvoicingPage from "@/pages/invoicing";
 import QualityPage from "@/pages/quality";
+import PlanningPage from "@/pages/planning";
+import ServiceOrdersPage from "@/pages/service-orders";
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
+    queries: { retry: 1, refetchOnWindowFocus: false },
   },
 });
 
-function PlaceholderPage({ title }: { title: string }) {
+function PlaceholderPage({ title, description }: { title: string; description?: string }) {
   return (
     <div className="flex items-center justify-center h-full p-8 animate-in fade-in">
       <div className="text-center space-y-3">
         <h2 className="text-2xl font-display font-semibold text-foreground">{title}</h2>
-        <p className="text-muted-foreground max-w-md mx-auto">This module is part of the ManufactureOS suite.</p>
+        <p className="text-muted-foreground max-w-md mx-auto">{description ?? "This module is part of the ManufactureOS suite."}</p>
       </div>
     </div>
   );
@@ -46,21 +46,31 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      {/* CRM */}
       <Route path="/customers" component={CustomersList} />
       <Route path="/customers/:id" component={CustomerDetail} />
+      {/* Sales */}
       <Route path="/salesorders" component={SalesOrdersList} />
+      {/* Planning & Purchasing */}
+      <Route path="/planning" component={PlanningPage} />
       <Route path="/purchaseorders" component={PurchaseOrdersPage} />
+      {/* Engineering */}
       <Route path="/items" component={ItemsList} />
-      <Route path="/inventory" component={InventoryPage} />
+      <Route path="/items/:id" component={ItemDetail} />
+      <Route path="/boms"><PlaceholderPage title="Bills of Material" description="BOM management with revision control and inline part creation." /></Route>
+      <Route path="/workcenters"><PlaceholderPage title="Work Centers" description="Configure manufacturing work centers and capacity." /></Route>
+      {/* Production */}
       <Route path="/workorders" component={WorkOrdersList} />
+      <Route path="/workorders/:id" component={WorkOrderDetail} />
+      <Route path="/serviceorders" component={ServiceOrdersPage} />
+      {/* Fulfillment */}
+      <Route path="/inventory" component={InventoryPage} />
       <Route path="/shipments" component={ShippingPage} />
       <Route path="/invoices" component={InvoicingPage} />
       <Route path="/quality" component={QualityPage} />
-      <Route path="/mrp" component={MrpDashboard} />
-      <Route path="/boms"><PlaceholderPage title="Bill of Materials" /></Route>
-      <Route path="/vendors"><PlaceholderPage title="Vendor Management" /></Route>
-      <Route path="/smarttransfer"><PlaceholderPage title="Smart Transfer Engine" /></Route>
-      <Route path="/admin"><PlaceholderPage title="Administration & Governance" /></Route>
+      {/* System */}
+      <Route path="/smarttransfer"><PlaceholderPage title="Smart Transfer Engine" description="Data import, export, and ETL mapping." /></Route>
+      <Route path="/admin"><PlaceholderPage title="Administration & Governance" description="Users, roles, permissions, and audit trail." /></Route>
       <Route component={NotFound} />
     </Switch>
   );
@@ -68,8 +78,8 @@ function Router() {
 
 function App() {
   const sidebarStyle = {
-    "--sidebar-width": "16rem",
-    "--sidebar-width-icon": "4rem",
+    "--sidebar-width": "15rem",
+    "--sidebar-width-icon": "3.5rem",
   };
 
   return (

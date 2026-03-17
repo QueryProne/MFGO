@@ -1,0 +1,729 @@
+You are an expert manufacturing ERP refactor engineer, production control architect, industrial scheduler, inventory manager, purchasing systems designer, and full-stack developer.
+
+You are updating an existing manufacturing administration / ERP codebase already in progress. This is a targeted in-place refactor and upgrade of the current system. It is not a greenfield rebuild.
+
+Your responsibility is to analyze the current codebase, preserve what is already working where reasonable, and implement a robust manufacturing-grade update so the system behaves like a real industrial planning, purchasing, BOM, engineering, inventory, and production control platform.
+
+You must think like a manufacturing scheduler, buyer, inventory control manager, and production administrator, not like a generic CRUD app developer.
+
+==================================================
+1. PRIMARY MISSION
+==================================================
+
+Refactor and extend the existing system so it supports these real-world manufacturing requirements:
+
+1. Planning / MRP and Purchasing must work together as one integrated operational module
+2. Item purchasing logic must be vendor-specific, not only item-specific
+3. BOM management must be upgraded to support industrial manufacturing standards
+4. BOM workflows must support creating new parts directly from BOM maintenance
+5. Subassemblies must be properly modeled and managed for planning, shop floor, and work order execution
+6. Work orders must be created from sales orders through a controlled conversion flow
+7. Sales order conversion must optionally create service orders in addition to work orders
+8. ECO / engineering change control must become effectivity-aware and operationally relevant
+9. Permissions must be stronger and more granular
+10. All important user changes must be tracked through robust audit/change history
+11. Inventory, planning, purchasing, BOMs, ECOs, and work orders must be tightly connected and traceable
+
+The end state must feel like a real manufacturing ERP used by a small-to-medium industrial company.
+
+==================================================
+2. GENERAL IMPLEMENTATION RULES
+==================================================
+
+You are modifying an existing project, so follow these rules:
+
+- preserve the current stack and working features where possible
+- do not rewrite everything unnecessarily
+- make surgical but well-engineered changes
+- normalize weak data structures where required
+- add migrations carefully and preserve existing data where possible
+- keep route and component structures understandable
+- separate business logic from route handlers
+- use transactions for critical multi-record operations
+- add clear service-layer functions for major workflows
+- add permission checks to critical actions
+- ensure audit logging is applied consistently
+- avoid superficial patches that create future technical debt
+
+Assume the current system uses:
+- React frontend
+- Express backend
+- PostgreSQL
+- Drizzle ORM
+- modular route structure
+
+Refactor within that architecture unless a specific improvement is clearly needed.
+
+==================================================
+3. CORE FUNCTIONAL REFACTOR: PLANNING & PURCHASING MUST BE ONE
+==================================================
+
+From an industrial manufacturing perspective, Planning / MRP and Purchasing should behave as one coordinated operational workbench.
+
+Do not simply leave planning recommendations on one screen and purchasing actions on another with no tight connection.
+
+Create one unified user-facing module called:
+
+PLANNING & PURCHASING
+
+This module should combine:
+- MRP recommendations
+- shortage visibility
+- planned purchase suggestions
+- planned work order suggestions
+- vendor exceptions
+- due-date exceptions
+- purchasing release actions
+- planner / buyer decisions
+- visibility to current supply and demand
+
+Internally, you may still keep separate tables for MRP results, purchase orders, and recommendations, but the workflow must behave as one integrated planning-purchasing process.
+
+Required behavior:
+- planners and buyers should be able to see demand, supply, shortages, lead times, vendor data, and release actions in one place
+- recommendations should be releasable directly into purchase orders or work orders
+- recommendations should carry demand-source traceability
+- vendor-specific planning data must drive purchased item suggestions
+- exception messages must be visible and actionable
+
+Create or refactor toward these backend services:
+- planningPurchasingWorkbenchService
+- recommendationReleaseService
+- shortageAnalysisService
+- vendorPlanningResolver
+- supplyDemandProjectionService
+
+Create or refactor endpoints such as:
+- GET /api/planning-purchasing/workbench
+- GET /api/planning-purchasing/recommendations
+- GET /api/planning-purchasing/exceptions
+- POST /api/planning-purchasing/release
+- GET /api/planning-purchasing/projections/:itemId
+
+Workbench results should include at minimum:
+- item
+- item number
+- item description
+- recommendation type
+- preferred vendor
+- vendor exception state
+- suggested quantity
+- required date
+- planned release date
+- lead time used
+- on hand
+- allocated
+- available
+- on order
+- open work order supply
+- shortage quantity
+- demand source type
+- demand source id
+- priority
+- planner / buyer
+- release status
+
+==================================================
+4. ITEM-VENDOR PURCHASING MODEL MUST BE ADDED
+==================================================
+
+The current style of storing lead time and safety stock only on the item is not sufficient for industrial purchasing control.
+
+Add a proper item-vendor purchasing model.
+
+Create a new table:
+item_vendors
+
+Minimum fields:
+- id
+- itemId
+- vendorId
+- vendorPartNumber
+- isPreferred
+- isApproved
+- leadTimeDays
+- minOrderQty
+- orderMultiple
+- purchaseUom
+- uomConversionToStock
+- safetyStockQty
+- reorderPointQty
+- lastCost
+- standardPurchaseCost
+- effectiveFrom
+- effectiveTo
+- notes
+- createdAt
+- updatedAt
+
+Business rules:
+- one item can have multiple vendors
+- one vendor assignment may be preferred
+- only approved vendors should be used automatically by planning
+- planning for purchased items must use the preferred approved vendor if present
+- if no preferred approved vendor exists, raise a vendor exception
+- item-level lead time and safety stock may remain only as fallback defaults
+
+Frontend requirements:
+- add a Purchasing tab to item detail
+- allow add/edit/remove vendor assignments
+- allow setting preferred vendor
+- display vendor part number, lead time, MOQ, order multiple, safety stock, reorder point, and costs
+
+API requirements:
+- GET /api/items/:id/vendors
+- POST /api/items/:id/vendors
+- PUT /api/item-vendors/:id
+- DELETE /api/item-vendors/:id
+
+==================================================
+5. PLANNING LOGIC MUST BECOME TIME-AWARE
+==================================================
+
+Current planning logic is too simplistic if it only shows static shortages or reorder suggestions.
+
+Upgrade planning logic so it becomes time-aware and scheduling-relevant.
+
+Add time-phased supply / demand projection behavior:
+- calculate projected available quantity over time
+- support daily or weekly buckets
+- consider due dates, lead times, incoming supply, and outgoing demand
+
+Demand inputs should include:
+- sales order demand
+- work order component demand
+- safety stock / reorder demand
+- service demand where relevant
+
+Supply inputs should include:
+- on-hand inventory
+- allocated inventory
+- open purchase orders
+- open work orders
+- transfer supply placeholder if present
+
+Recommendation types should include at minimum:
+- planned_po
+- planned_wo
+- shortage
+- timing_shortage
+- vendor_missing
+- reschedule_in placeholder
+- reschedule_out placeholder
+
+Recommendations should include:
+- dueDate
+- needDate
+- leadTimeUsed
+- demandSourceType
+- demandSourceId
+- salesOrderId if relevant
+- salesOrderLineId if relevant
+- parentWorkOrderId if relevant
+
+Do not overcomplicate with APS-level finite scheduling yet, but make the data structure correct.
+
+==================================================
+6. ALLOCATION / RESERVATION CONTROL MUST BE IMPROVED
+==================================================
+
+Inventory must not appear available when it is already committed.
+
+Refactor inventory and planning logic to clearly support:
+- onHandQty
+- allocatedQty
+- availableQty
+- onOrderQty
+- inProcessQty or WIP supply placeholder
+
+Rules:
+- availableQty = onHandQty - allocatedQty
+- sales orders can reserve inventory
+- work order materials can allocate inventory
+- allocation cannot exceed available quantity unless an explicit override path exists
+- shortages should be calculated using available quantity, not raw on-hand quantity
+
+Ensure this logic is reflected in:
+- planning workbench
+- work order materials
+- item availability views
+- purchase planning suggestions
+
+==================================================
+7. BOM MANAGEMENT MUST BE UPGRADED TO INDUSTRIAL BEST PRACTICE
+==================================================
+
+The current BOM model is too light for real industrial use.
+
+Upgrade BOM management so it supports:
+- BOM revisions
+- BOM statuses
+- effective dates
+- component planning attributes
+- proper subassembly treatment
+- quick part creation
+- stronger engineering and production traceability
+
+Required BOM header fields:
+- id
+- parentItemId
+- revision
+- status (draft, approved, released, obsolete)
+- effectiveFrom
+- effectiveTo
+- notes
+- createdAt
+- updatedAt
+
+Required BOM line fields:
+- id
+- bomId
+- componentItemId
+- lineNumber
+- qtyPer
+- scrapFactor
+- issueMethod (manual, backflush)
+- lineType or componentType
+- effectiveFrom
+- effectiveTo
+- notes
+- substituteGroup placeholder if useful
+- createdAt
+- updatedAt
+
+Required BOM behavior:
+- users must be able to create a new part directly from the BOM screen
+- quick-create from BOM must support:
+  - purchased part
+  - manufactured part
+  - subassembly
+- after creation, the new part must be attachable immediately to the BOM line
+- BOM compare and where-used should be supported if already partly present or feasible to extend
+- BOM revision and release state must be respected by planning and work order generation
+
+Frontend changes:
+- extend BOM editor with Create Part action
+- use modal/drawer for quick-create
+- support creating item and returning it to current BOM line entry without losing context
+
+==================================================
+8. SUBASSEMBLY MANAGEMENT MUST BE EXPLICIT
+==================================================
+
+Subassemblies must not be treated as ordinary flat BOM rows with no execution policy.
+
+Add explicit item-level supply / fulfillment policy.
+
+On items, add or refactor a field such as:
+supplyType or fulfillmentPolicy
+
+Supported values:
+- purchased
+- manufactured
+- subassembly_stocked
+- subassembly_order_built
+- phantom
+- service
+
+Behavior rules:
+- purchased: create purchasing demand
+- manufactured: create manufacturing demand
+- subassembly_stocked: consume inventory first; replenish through WO if needed
+- subassembly_order_built: create child work order during parent WO creation
+- phantom: explode directly into parent WO material demand
+- service: do not create manufacturing demand
+
+This is critical for industrial work order flow.
+
+==================================================
+9. WORK ORDER CREATION MUST BE DRIVEN FROM SALES ORDERS
+==================================================
+
+Work orders must be created through a real conversion process, not loosely linked manually.
+
+Create a controlled sales-order-to-downstream conversion service.
+
+Add endpoint:
+POST /api/salesorders/:id/convert-to-downstream
+
+Payload should support:
+- selected line ids
+- conversion mode per line
+- site / warehouse
+- scheduling options if needed
+- whether to create service order as well
+
+Supported conversion modes per sales order line:
+- work_order
+- service_order
+- both
+- none
+
+Rules:
+- manufactured items should default toward work order
+- service items should default toward service order
+- subassembly_order_built items should create work orders
+- hybrid lines may allow both
+- resulting records must preserve traceability back to sales order and line
+
+Add or improve work order creation service so it:
+- creates the work order header
+- explodes the released BOM revision
+- creates work order material lines
+- evaluates subassembly policies
+- creates child work orders for order-built subassemblies
+- explodes phantom components into parent demand
+- calculates shortages and allocations
+- retains sales order linkage
+
+==================================================
+10. SERVICE ORDERS MUST BE ADDED AS A FIRST-CLASS OPTION
+==================================================
+
+Add a service_orders entity and related pages/endpoints.
+
+Minimum service_orders fields:
+- id
+- number
+- salesOrderId
+- salesOrderLineId
+- customerId
+- itemId nullable
+- serviceType
+- status
+- requestedDate
+- scheduledDate
+- completionDate
+- customerSite
+- assetReference
+- plannedHours
+- actualHours
+- notes
+- createdAt
+- updatedAt
+
+Use service orders for:
+- installation
+- calibration
+- repair
+- field service
+- startup / commissioning
+- service labor tied to a sales order
+
+Sales order conversion should support creating:
+- work order only
+- service order only
+- both work order and service order
+
+Frontend requirements:
+- add service order list page
+- add service order detail page
+- add sales order convert flow UI to support service order creation
+
+==================================================
+11. WORK ORDER MATERIALS AND SHOP FLOOR READINESS MUST IMPROVE
+==================================================
+
+Add or improve a work_order_materials structure.
+
+Minimum fields:
+- id
+- workOrderId
+- bomLineId nullable
+- itemId
+- requiredQty
+- issuedQty
+- allocatedQty
+- shortageQty
+- supplyTypeSnapshot
+- sourceWorkOrderId nullable
+- notes
+- createdAt
+- updatedAt
+
+Behavior:
+- required quantity comes from BOM explosion
+- allocated quantity reflects reserved inventory
+- issued quantity reflects actual issue to job
+- shortage quantity is computed against available/allocated logic
+- sourceWorkOrderId should link child/parent subassembly relationships where useful
+
+Frontend:
+- add Materials tab to work order detail
+- show required, allocated, issued, shortage, and supply type
+- show child WO relationships if created
+
+==================================================
+12. ECO / ENGINEERING CHANGE CONTROL MUST BE UPGRADED
+==================================================
+
+The current ECO manager is not sufficient unless it controls effectivity and operational impact.
+
+Add or improve ECO support with a true lifecycle.
+
+ECO header fields:
+- id
+- number
+- status (draft, review, approved, released, implemented, cancelled)
+- effectiveDate
+- effectivityType (immediate, next_order, after_inventory_depletion, specific_date if useful)
+- description
+- createdAt
+- updatedAt
+
+ECO impacts table:
+- id
+- ecoId
+- entityType
+- entityId
+- changeType
+- beforeSnapshot json
+- afterSnapshot json
+- createdAt
+
+Required ECO behavior:
+- only approved ECOs can be released
+- only released ECOs affect planning and downstream operations
+- releasing an ECO must trigger impact evaluation for:
+  - open work orders
+  - open purchase orders
+  - inventory on hand
+  - sales orders
+- planning should be re-evaluated when an ECO changes released BOM or part structure
+- old vs new structure must be visible for controlled change analysis
+
+Add endpoint:
+GET /api/eco/:id/impact
+
+Return:
+- affected work orders
+- affected purchase orders
+- affected inventory
+- affected sales orders
+- recommended follow-up actions if possible
+
+==================================================
+13. ADMINISTRATION MANAGEMENT MUST BE STRENGTHENED
+==================================================
+
+Administration management is a core feature, not an afterthought.
+
+Strengthen permissions and governance.
+
+Standardize structured permissions such as:
+- planning.view
+- planning.release
+- purchasing.view
+- purchasing.create_po
+- purchasing.edit_vendor_assignment
+- bom.view
+- bom.edit
+- eco.view
+- eco.release
+- workorder.create
+- workorder.release
+- serviceorder.create
+- inventory.allocate
+- admin.manage_permissions
+- admin.view_audit
+
+Add middleware or service guards:
+- requirePermission("module.action")
+
+Apply permission checks to:
+- item vendor maintenance
+- BOM editing
+- ECO release
+- sales order conversion
+- work order creation
+- service order creation
+- recommendation release
+- administrative permission changes
+
+==================================================
+14. AUDIT / CHANGE TRACKING MUST BE SYSTEMATIC
+==================================================
+
+All critical business changes must be traceable by user.
+
+Strengthen or refactor audit logging so all important mutations log:
+- entity
+- entityId
+- action
+- userId
+- timestamp
+- before snapshot
+- after snapshot
+- fieldChanges if feasible
+- source (UI, API, import, job)
+
+Mandatory audit events include:
+- ITEM_CREATED
+- ITEM_UPDATED
+- ITEM_VENDOR_CREATED
+- ITEM_VENDOR_UPDATED
+- BOM_CREATED
+- BOM_UPDATED
+- BOM_RELEASED
+- ECO_CREATED
+- ECO_RELEASED
+- SALES_ORDER_CONVERTED
+- WORK_ORDER_CREATED
+- SERVICE_ORDER_CREATED
+- RECOMMENDATION_RELEASED
+- PERMISSION_CHANGED
+
+Add endpoint:
+GET /api/audit-logs
+
+Support filters for:
+- entity
+- entityId
+- userId
+- date range
+- action
+
+Every important record detail page should be capable of showing change history if such UI already exists or can be extended efficiently.
+
+==================================================
+15. FRONTEND UPDATE REQUIREMENTS
+==================================================
+
+Do not redesign the entire application. Extend the existing UI surgically.
+
+Required UI updates:
+
+1. Item Detail
+- add Purchasing tab
+- show item-vendor assignments
+- allow vendor add/edit/delete
+- show preferred vendor and purchasing rules
+
+2. Planning & Purchasing Workbench
+- combined view for shortages, planned POs, planned WOs, and exceptions
+- filters by item, vendor, type, due date, status, buyer/planner
+- row actions for release PO, create WO, open source, open item
+
+3. BOM Editor
+- add Create Part action
+- quick-create modal/drawer
+- allow purchased, manufactured, and subassembly creation inline
+
+4. Sales Order Detail
+- add Convert action
+- allow per-line conversion to work order, service order, or both
+
+5. Work Order Detail
+- add Materials tab
+- show shortages, allocations, issued quantity, and subassembly relationships
+
+6. Service Orders
+- add list page
+- add detail page
+
+7. Audit Visibility
+- expose audit history where practical for items, BOMs, ECOs, work orders, sales orders
+
+==================================================
+16. DATABASE AND MIGRATION CHANGES
+==================================================
+
+Implement schema changes carefully.
+
+At minimum add or improve:
+- item_vendors
+- service_orders
+- work_order_materials
+- eco_impacts
+- item supply type / fulfillment policy
+- recommendation linkage fields
+- BOM revision/status/effective fields if missing
+
+Preserve existing demo/seed data where possible.
+If migration is required, write migration scripts instead of forcing data loss.
+
+==================================================
+17. SEED / DEMO DATA UPDATES
+==================================================
+
+Update seed data so the new workflows can be demonstrated.
+
+Seed at least:
+- one purchased item with multiple vendors
+- one preferred approved vendor
+- one manufactured finished good
+- one stocked subassembly
+- one order-built subassembly
+- one phantom component example
+- one service item
+- one sales order convertible to work order
+- one sales order convertible to service order
+- one hybrid sales order line convertible to both
+- one ECO affecting an active BOM
+- one planning shortage that resolves through PO release
+
+==================================================
+18. IMPLEMENTATION ORDER
+==================================================
+
+Implement in this order:
+
+1. analyze current schema, services, routes, and UI structure
+2. add database migrations
+3. add/refactor item-vendor purchasing model
+4. refactor planning engine to become time-aware and vendor-aware
+5. build planning & purchasing workbench service
+6. refactor BOM model and BOM quick-create flow
+7. add supply type / subassembly handling
+8. add/refactor sales order downstream conversion service
+9. add service orders
+10. add/improve work order materials and child WO logic
+11. add/improve ECO impact and release behavior
+12. add permission guards
+13. add comprehensive audit logging coverage
+14. update frontend pages
+15. update seed/demo data
+16. verify end-to-end flows
+
+==================================================
+19. ACCEPTANCE CRITERIA
+==================================================
+
+The refactor is complete only when all of the following are true:
+
+- planning and purchasing operate as one integrated workbench
+- purchased items use vendor-specific planning data
+- items support multiple vendors with one preferred approved vendor
+- BOM editor can create new parts inline
+- BOMs support revision/status/effective-date behavior
+- subassembly policy is explicit and respected
+- phantom items explode into parent demand
+- order-built subassemblies create child work orders
+- sales orders can convert to work orders
+- sales orders can optionally create service orders
+- work orders retain traceability to sales order demand
+- ECO release affects planning and exposes impact analysis
+- permissions protect sensitive actions
+- audit logs capture all key business changes
+- updated seed data demonstrates the workflows end-to-end
+
+==================================================
+20. FINAL INSTRUCTION
+==================================================
+
+Do not produce generic advice.
+
+Inspect the existing codebase and implement the refactor in real code.
+
+Prefer minimal but correct changes over broad rewrites.
+
+Use manufacturing best practices:
+- demand drives supply
+- purchasing is vendor-specific
+- planning is time-aware
+- subassemblies are real supply objects
+- BOM and ECO control production structure
+- service demand can exist alongside manufacturing demand
+- permissions and change tracking are mandatory
+
+Begin by analyzing the current schema and route structure, then implement the backend and migration changes first before updating the frontend.

@@ -24,6 +24,14 @@ export const mrpRecommendationsTable = pgTable("mrp_recommendations", {
   priority: text("priority"),
   message: text("message"),
   status: text("status").notNull().default("open"),
+  salesOrderId: text("sales_order_id"),
+  salesOrderLineId: text("sales_order_line_id"),
+  parentWorkOrderId: text("parent_work_order_id"),
+  peggingContext: jsonb("pegging_context"),
+  vendorException: text("vendor_exception"),
+  releasedPurchaseOrderId: text("released_purchase_order_id"),
+  releasedWorkOrderId: text("released_work_order_id"),
+  releasedAt: timestamp("released_at"),
 });
 
 export const planningScenariosTable = pgTable("planning_scenarios", {
