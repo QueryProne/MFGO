@@ -19,6 +19,7 @@ import { PageHeader } from "@/components/ui-patterns";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { api, DashboardKpis, SalesOrder, WorkOrder, PaginatedResponse } from "@/lib/api";
 import { formatDistanceToNow, parseISO } from "date-fns";
+import { AICopilotChat } from "@/components/ai/ai-copilot-chat";
 
 const revenueData = [
   { name: "Oct", revenue: 82000 },
@@ -296,6 +297,8 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <AICopilotChat className="max-w-4xl" />
     </div>
   );
 }

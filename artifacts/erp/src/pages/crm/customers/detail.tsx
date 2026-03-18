@@ -6,10 +6,19 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Mail, Phone, MapPin, CreditCard, Clock, FileText, ShoppingCart } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TaskList } from "@/components/tasks/task-list";
+import { EmailComposer } from "@/components/email/email-composer";
+import { AICopilotChat } from "@/components/ai/ai-copilot-chat";
+import { UnifiedActivityTimeline } from "@/components/activity/unified-activity-timeline";
 
 export default function CustomerDetail() {
   const { id } = useParams();
-  const { data: customer, isLoading, error } = useGetCustomer(id || "", { query: { enabled: !!id } });
+  const { data: customer, isLoading, error } = useGetCustomer(id || "", {
+    query: {
+      enabled: !!id,
+      queryKey: ["/api/customers", id],
+    },
+  });
 
   if (isLoading) {
     return (
@@ -100,11 +109,12 @@ export default function CustomerDetail() {
 
         <div className="lg:col-span-2">
           <Tabs defaultValue="orders" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 bg-secondary/50 p-1 rounded-lg">
+            <TabsList className="grid w-full grid-cols-5 bg-secondary/50 p-1 rounded-lg">
               <TabsTrigger value="orders">Orders</TabsTrigger>
-              <TabsTrigger value="quotes">Quotes</TabsTrigger>
-              <TabsTrigger value="invoices">Invoices</TabsTrigger>
-              <TabsTrigger value="contacts">Contacts</TabsTrigger>
+              <TabsTrigger value="timeline">Timeline</TabsTrigger>
+              <TabsTrigger value="tasks">Tasks</TabsTrigger>
+              <TabsTrigger value="email">Email</TabsTrigger>
+              <TabsTrigger value="copilot">Copilot</TabsTrigger>
             </TabsList>
             
             <TabsContent value="orders" className="mt-4 focus-visible:outline-none focus-visible:ring-0">
@@ -120,10 +130,18 @@ export default function CustomerDetail() {
               </Card>
             </TabsContent>
             
-            {/* Other tabs would follow similar pattern */}
-            <TabsContent value="quotes"><Card className="p-12 text-center text-muted-foreground border-border/50 shadow-sm min-h-[400px]">Quotes panel</Card></TabsContent>
-            <TabsContent value="invoices"><Card className="p-12 text-center text-muted-foreground border-border/50 shadow-sm min-h-[400px]">Invoices panel</Card></TabsContent>
-            <TabsContent value="contacts"><Card className="p-12 text-center text-muted-foreground border-border/50 shadow-sm min-h-[400px]">Contacts panel</Card></TabsContent>
+            <TabsContent value="timeline" className="mt-4 focus-visible:outline-none focus-visible:ring-0">
+              <UnifiedActivityTimeline entityType="customer" entityId={customer.id} />
+            </TabsContent>
+            <TabsContent value="tasks" className="mt-4 focus-visible:outline-none focus-visible:ring-0">
+              <TaskList entityType="customer" entityId={customer.id} />
+            </TabsContent>
+            <TabsContent value="email" className="mt-4 focus-visible:outline-none focus-visible:ring-0">
+              <EmailComposer entityType="customer" entityId={customer.id} defaultTo={customer.email || undefined} />
+            </TabsContent>
+            <TabsContent value="copilot" className="mt-4 focus-visible:outline-none focus-visible:ring-0">
+              <AICopilotChat entityType="customer" entityId={customer.id} />
+            </TabsContent>
           </Tabs>
         </div>
       </div>

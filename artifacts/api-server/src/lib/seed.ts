@@ -6,17 +6,38 @@ import {
   salesOrdersTable, salesOrderLinesTable, purchaseOrdersTable, purchaseOrderLinesTable,
   workOrdersTable, shipmentsTable, invoicesTable, inspectionsTable, nonconformancesTable,
   mrpRunsTable, mrpRecommendationsTable,
+  tasksTable, leadsTable, opportunitiesTable, opportunityStageHistoryTable,
+  aiLeadScoresTable, automationRulesTable, activityTimelineTable, chatLogsTable,
+  commEmailConversationsTable, commEmailMessagesTable, commEmailRecipientsTable,
+  commEmailContextLinksTable, commEmailTemplatesTable, commEmailTemplateVersionsTable,
+  emailSequencesTable, emailSequenceStepsTable, emailSequenceEnrollmentsTable,
 } from "@workspace/db";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 async function tableHasRows(table: any, idCol: any): Promise<boolean> {
   const res = await db.select({ count: sql<number>`count(*)` }).from(table);
   return Number(res[0]?.count ?? 0) > 0;
 }
 
+async function ensureSystemUserExists(): Promise<void> {
+  await db
+    .insert(usersTable)
+    .values({
+      id: "system-user",
+      email: "system@manufactureos.local",
+      firstName: "System",
+      lastName: "User",
+      status: "active",
+      department: "System",
+      roleId: null,
+    })
+    .onConflictDoNothing();
+}
+
 export async function seed() {
   const hasData = await tableHasRows(customersTable, customersTable.id);
   if (hasData) {
+    await ensureSystemUserExists();
     console.log("[seed] Data already exists, skipping seed.");
     return;
   }
@@ -32,10 +53,11 @@ export async function seed() {
 
   // Users
   await db.insert(usersTable).values([
-    { email: "admin@manufactureOS.com", firstName: "Admin", lastName: "User", roleId: adminRole.id, department: "IT", status: "active" },
+    { id: "system-user", email: "admin@manufactureOS.com", firstName: "Admin", lastName: "User", roleId: adminRole.id, department: "IT", status: "active" },
     { email: "planner@manufactureOS.com", firstName: "Sarah", lastName: "Chen", roleId: plannerRole.id, department: "Production", status: "active" },
     { email: "operator@manufactureOS.com", firstName: "Mike", lastName: "Torres", roleId: operatorRole.id, department: "Shop Floor", status: "active" },
   ]).returning();
+  const systemUserId = "system-user";
 
   // Warehouses
   const [mainWH, qcWH] = await db.insert(warehousesTable).values([
@@ -45,9 +67,9 @@ export async function seed() {
 
   // Work Centers
   const [wc1, wc2, wc3] = await db.insert(workcentersTable).values([
-    { name: "CNC Machining", code: "CNC-01", description: "3-axis CNC mill", capacity: "16", uom: "hours/day", hourlyRate: "85.00", status: "active" },
-    { name: "Assembly Line A", code: "ASM-A", description: "General assembly", capacity: "16", uom: "hours/day", hourlyRate: "45.00", status: "active" },
-    { name: "Quality Control", code: "QC-01", description: "Final inspection station", capacity: "8", uom: "hours/day", hourlyRate: "60.00", status: "active" },
+    { name: "CNC Machining", code: "CNC-01", notes: "3-axis CNC mill", capacity: "16", capacityUom: "hours/day", status: "active" },
+    { name: "Assembly Line A", code: "ASM-A", notes: "General assembly", capacity: "16", capacityUom: "hours/day", status: "active" },
+    { name: "Quality Control", code: "QC-01", notes: "Final inspection station", capacity: "8", capacityUom: "hours/day", status: "active" },
   ]).returning();
 
   // Customers
@@ -93,31 +115,31 @@ export async function seed() {
     {
       number: "RM-0001", name: "Steel Rod 1.5\" OD x 12\"", type: "raw_material",
       uom: "EA", description: "Hot-rolled 1018 steel rod", standardCost: "8.50",
-      status: "active", unitPrice: "8.50", weight: "2.1", weightUom: "lbs",
+      status: "active", listPrice: "8.50", weight: "2.1",
       safetyStock: "100", reorderPoint: "50", reorderQty: "500", leadTime: 7,
     },
     {
       number: "RM-0002", name: "Grade 8 Hex Bolt 1/2-13", type: "purchased_part",
       uom: "EA", description: "1/2-13 x 2 Grade 8 hex bolt zinc plated", standardCost: "0.45",
-      status: "active", unitPrice: "0.45",
+      status: "active", listPrice: "0.45",
       safetyStock: "500", reorderPoint: "250", reorderQty: "2000", leadTime: 3,
     },
     {
       number: "MFG-0001", name: "Steel Mounting Bracket", type: "manufactured",
       uom: "EA", description: "CNC machined steel mounting bracket", standardCost: "45.00",
-      status: "active", unitPrice: "125.00", weight: "1.8", weightUom: "lbs",
+      status: "active", listPrice: "125.00", weight: "1.8",
       safetyStock: "20", reorderPoint: "10", reorderQty: "50", leadTime: 5,
     },
     {
       number: "MFG-0002", name: "DC Motor Assembly", type: "manufactured",
       uom: "EA", description: "24V DC brushless motor with encoder", standardCost: "220.00",
-      status: "active", unitPrice: "580.00", weight: "4.2", weightUom: "lbs",
+      status: "active", listPrice: "580.00", weight: "4.2",
       safetyStock: "10", reorderPoint: "5", reorderQty: "25", leadTime: 10,
     },
     {
       number: "FG-0001", name: "Industrial Drive Unit Model A", type: "finished_good",
       uom: "EA", description: "Complete industrial drive assembly", standardCost: "485.00",
-      status: "active", unitPrice: "1250.00", weight: "12.5", weightUom: "lbs",
+      status: "active", listPrice: "1250.00", weight: "12.5",
       safetyStock: "5", reorderPoint: "3", reorderQty: "10", leadTime: 14,
     },
   ]).returning();
@@ -262,6 +284,341 @@ export async function seed() {
       invoiceDate: "2026-03-08", dueDate: "2026-04-22",
       subtotal: "15600.00", taxAmount: "1248.00", totalAmount: "16848.00",
       amountPaid: "0.00", paymentTerms: "Net 45",
+    },
+  ]);
+
+  // Shared Tasks
+  const [task1, task2, task3] = await db.insert(tasksTable).values([
+    {
+      entityType: "customer",
+      entityId: cust1.id,
+      title: "Call purchasing team for revised blanket PO",
+      description: "Confirm Q2 order cadence and release windows for SO-1001 follow-on demand.",
+      status: "open",
+      priority: "high",
+      dueDate: new Date("2026-03-21"),
+      createdBy: systemUserId,
+      reminders: [{ channel: "in_app", at: "2026-03-20T14:00:00.000Z" }],
+      comments: [{ id: crypto.randomUUID(), body: "Customer requested callback after internal budget meeting.", createdAt: new Date().toISOString() }],
+    },
+    {
+      entityType: "vendor",
+      entityId: vend1.id,
+      title: "Request steel mill certs for lot LOT-2026-001",
+      description: "Quality requested COA + heat treat documentation.",
+      status: "in_progress",
+      priority: "medium",
+      dueDate: new Date("2026-03-22"),
+      createdBy: systemUserId,
+      reminders: [],
+      comments: [],
+    },
+    {
+      entityType: "workorder",
+      entityId: wo1.id,
+      title: "Validate fixture readiness before WO-1001 run",
+      description: "Production engineering to confirm fixture revision A is on cell CNC-01.",
+      status: "open",
+      priority: "high",
+      dueDate: new Date("2026-03-18"),
+      createdBy: systemUserId,
+      reminders: [],
+      comments: [],
+    },
+  ]).returning();
+
+  // CRM Funnel
+  const [lead1, lead2] = await db.insert(leadsTable).values([
+    {
+      number: "LD-1001",
+      firstName: "Evelyn",
+      lastName: "Brooks",
+      companyName: "Acme Industrial Corp",
+      email: "evelyn.brooks@acmeindustrial.com",
+      phone: "313-555-0192",
+      source: "referral",
+      status: "qualified",
+      ownerId: systemUserId,
+      notes: "Existing account expansion lead for custom drive train package.",
+    },
+    {
+      number: "LD-1002",
+      firstName: "Daniel",
+      lastName: "Miller",
+      companyName: "Northline Fabrication",
+      email: "dmiller@northlinefab.com",
+      phone: "734-555-8802",
+      source: "website",
+      status: "new",
+      ownerId: systemUserId,
+      notes: "Inbound inquiry for pilot lot of 20 drive units.",
+    },
+  ]).returning();
+
+  const [opp1, opp2] = await db.insert(opportunitiesTable).values([
+    {
+      number: "OPP-1001",
+      name: "Acme Q2 Platform Expansion",
+      stage: "proposal",
+      status: "open",
+      amount: "185000.00",
+      probability: 55,
+      expectedCloseDate: new Date("2026-04-28"),
+      customerId: cust1.id,
+      leadId: lead1.id,
+      ownerId: systemUserId,
+      notes: "Expansion opportunity tied to retrofit program.",
+    },
+    {
+      number: "OPP-1002",
+      name: "Northline Pilot Program",
+      stage: "qualification",
+      status: "open",
+      amount: "42000.00",
+      probability: 25,
+      expectedCloseDate: new Date("2026-05-10"),
+      leadId: lead2.id,
+      ownerId: systemUserId,
+      notes: "Early-stage opportunity from web lead.",
+    },
+  ]).returning();
+
+  await db.insert(opportunityStageHistoryTable).values([
+    { opportunityId: opp1.id, fromStage: null, toStage: "proposal", changedBy: systemUserId, note: "Imported seed stage" },
+    { opportunityId: opp2.id, fromStage: null, toStage: "qualification", changedBy: systemUserId, note: "Imported seed stage" },
+  ]);
+
+  await db.insert(aiLeadScoresTable).values([
+    {
+      leadId: lead1.id,
+      modelName: "heuristic-v1",
+      score: 84,
+      confidence: 72,
+      reasoning: "Referral source + qualified stage + complete contact details.",
+      factors: JSON.stringify(["referral_source", "qualified_status", "contact_complete"]),
+      scoredBy: systemUserId,
+    },
+    {
+      leadId: lead2.id,
+      modelName: "heuristic-v1",
+      score: 63,
+      confidence: 68,
+      reasoning: "New inbound lead with full contact profile.",
+      factors: JSON.stringify(["new_status", "contact_complete"]),
+      scoredBy: systemUserId,
+    },
+  ]);
+
+  // Shared Email Template + Message
+  const [seedTemplate] = await db.insert(commEmailTemplatesTable).values([
+    {
+      code: "PO_TRANSMITTAL",
+      name: "PO Transmittal",
+      category: "purchasing",
+      module: "purchase_orders",
+      description: "Standard PO transmittal with attached drawings/specs.",
+      isActive: true,
+      tenantId: "default",
+      createdBy: systemUserId,
+    },
+  ]).returning();
+
+  const [seedTemplateVersion] = await db.insert(commEmailTemplateVersionsTable).values([
+    {
+      templateId: seedTemplate.id,
+      version: 1,
+      status: "active",
+      isActive: true,
+      subjectTemplate: "Purchase Order {{po_number}} from ManufactureOS",
+      bodyHtmlTemplate: "<p>Hello {{vendor_name}},</p><p>Please find attached PO {{po_number}}.</p>",
+      bodyTextTemplate: "Hello {{vendor_name}}, Please find attached PO {{po_number}}.",
+      createdBy: systemUserId,
+    },
+  ]).returning();
+
+  await db.update(commEmailTemplatesTable).set({ activeVersionId: seedTemplateVersion.id }).where(eq(commEmailTemplatesTable.id, seedTemplate.id));
+
+  const [conversation] = await db.insert(commEmailConversationsTable).values([
+    {
+      conversationKey: crypto.randomUUID(),
+      subject: "PO-1001 transmittal",
+      status: "active",
+      tenantId: "default",
+      createdBy: systemUserId,
+      lastMessageAt: new Date(),
+    },
+  ]).returning();
+
+  const [seedMessage] = await db.insert(commEmailMessagesTable).values([
+    {
+      direction: "outbound",
+      status: "sent",
+      subject: "Purchase Order PO-1001 from ManufactureOS",
+      bodyHtml: "<p>Attached is PO-1001 for steel restock.</p>",
+      bodyText: "Attached is PO-1001 for steel restock.",
+      fromAddress: "purchasing@manufactureos.com",
+      replyTo: "buyer@manufactureos.com",
+      messageId: `<${crypto.randomUUID()}@manufactureos.local>`,
+      conversationId: conversation.id,
+      templateId: seedTemplate.id,
+      templateVersionId: seedTemplateVersion.id,
+      providerName: "mock",
+      sourceModule: "purchaseorders",
+      sourceAction: "send",
+      createdBy: systemUserId,
+      tenantId: "default",
+      queuedAt: new Date("2026-03-10T10:00:00.000Z"),
+      sentAt: new Date("2026-03-10T10:01:00.000Z"),
+    },
+  ]).returning();
+
+  await db.insert(commEmailRecipientsTable).values([
+    {
+      messageId: seedMessage.id,
+      recipientType: "to",
+      emailAddress: "orders@steelco.com",
+      displayName: "SteelCo Purchasing",
+      deliveryStatus: "delivered",
+      deliveredAt: new Date("2026-03-10T10:02:00.000Z"),
+      sortOrder: 0,
+    },
+  ]);
+
+  await db.insert(commEmailContextLinksTable).values([
+    {
+      messageId: seedMessage.id,
+      entityType: "vendor",
+      entityId: vend1.id,
+      relatedEntityType: "purchase_order",
+      relatedEntityId: po1.id,
+      linkRole: "primary",
+      tenantId: "default",
+      createdBy: systemUserId,
+    },
+  ]);
+
+  // Email sequences + enrollment
+  const [sequence] = await db.insert(emailSequencesTable).values([
+    {
+      name: "Overdue Payment Reminder",
+      description: "Three-touch reminder sequence for overdue invoices.",
+      module: "invoicing",
+      entryEntityType: "customer",
+      isActive: true,
+      createdBy: systemUserId,
+    },
+  ]).returning();
+
+  await db.insert(emailSequenceStepsTable).values([
+    {
+      sequenceId: sequence.id,
+      stepNumber: 1,
+      templateId: seedTemplate.id,
+      subjectOverride: "Reminder: Outstanding balance",
+      bodyTextOverride: "Friendly reminder: your invoice is overdue.",
+      delayDays: 0,
+      trackingEnabled: true,
+    },
+    {
+      sequenceId: sequence.id,
+      stepNumber: 2,
+      templateId: seedTemplate.id,
+      subjectOverride: "Second notice: Outstanding balance",
+      bodyTextOverride: "Please review overdue invoice details.",
+      delayDays: 7,
+      trackingEnabled: true,
+    },
+  ]);
+
+  await db.insert(emailSequenceEnrollmentsTable).values([
+    {
+      sequenceId: sequence.id,
+      entityType: "customer",
+      entityId: cust2.id,
+      status: "active",
+      currentStep: 1,
+      sentCount: 0,
+      nextSendAt: new Date("2026-03-22T09:00:00.000Z"),
+      createdBy: systemUserId,
+    },
+  ]);
+
+  // Automation rule
+  await db.insert(automationRulesTable).values([
+    {
+      name: "Overdue task escalation",
+      description: "If task is overdue by 2+ days, notify owner and planner queue.",
+      triggerEvent: "task.overdue",
+      conditionJson: { status: "open", overdueDays: { gte: 2 } },
+      actionJson: { type: "notify", channel: "in_app", targets: ["assignee", "planner"] },
+      isActive: true,
+      createdBy: systemUserId,
+    },
+  ]);
+
+  // Timeline + Chat
+  await db.insert(activityTimelineTable).values([
+    {
+      entityType: "customer",
+      entityId: cust1.id,
+      activityType: "task",
+      sourceType: "task",
+      sourceId: task1.id,
+      title: `Task created: ${task1.title}`,
+      body: task1.description,
+      actorId: systemUserId,
+      metadata: { status: task1.status, priority: task1.priority },
+    },
+    {
+      entityType: "vendor",
+      entityId: vend1.id,
+      activityType: "email",
+      sourceType: "email",
+      sourceId: seedMessage.id,
+      title: seedMessage.subject,
+      body: "PO transmittal sent to supplier",
+      actorId: systemUserId,
+      metadata: { status: seedMessage.status, direction: seedMessage.direction },
+    },
+    {
+      entityType: "opportunity",
+      entityId: opp1.id,
+      activityType: "opportunity",
+      sourceType: "opportunity",
+      sourceId: opp1.id,
+      title: `Opportunity created: ${opp1.name}`,
+      actorId: systemUserId,
+      metadata: { stage: opp1.stage, amount: opp1.amount, probability: opp1.probability },
+    },
+  ]);
+
+  const [chatLog] = await db.insert(chatLogsTable).values([
+    {
+      entityType: "customer",
+      entityId: cust1.id,
+      queryText: "List open tasks for customer Acme",
+      responseText: "Acme currently has one open high-priority follow-up task due this week.",
+      intent: "tasks_by_customer",
+      provider: "local-fallback",
+      model: "none",
+      contextRows: [{ taskId: task1.id, title: task1.title, status: task1.status, priority: task1.priority }],
+      responseMetadata: { seeded: true },
+      createdBy: systemUserId,
+      redacted: true,
+    },
+  ]).returning();
+
+  await db.insert(activityTimelineTable).values([
+    {
+      entityType: "customer",
+      entityId: cust1.id,
+      activityType: "chat",
+      sourceType: "chat",
+      sourceId: chatLog.id,
+      title: "AI queried",
+      body: "List open tasks for customer Acme",
+      actorId: systemUserId,
+      metadata: { intent: "tasks_by_customer" },
     },
   ]);
 

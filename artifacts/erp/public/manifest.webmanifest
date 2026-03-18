@@ -1,0 +1,21 @@
+{
+  "name": "ManufactureOS ERP",
+  "short_name": "MFGO",
+  "description": "Manufacturing ERP with CRM, planning, production, communications, and AI copilot.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020817",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/images/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

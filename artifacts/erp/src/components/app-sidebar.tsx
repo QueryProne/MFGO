@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { 
   LayoutDashboard, Users, ShoppingCart, Package, Wrench,
   Boxes, Truck, FileText, CheckSquare, Database, Settings,
-  Factory, BarChart3, Layers, Headphones,
+  Factory, BarChart3, Layers, Headphones, UserRoundPlus, Handshake, MessageSquare,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -14,7 +14,10 @@ const navGroups = [
     label: "Core",
     items: [
       { title: "Dashboard", url: "/", icon: LayoutDashboard },
-      { title: "CRM", url: "/customers", icon: Users },
+      { title: "Customers", url: "/customers", icon: Users },
+      { title: "Vendors", url: "/vendors", icon: Factory },
+      { title: "Leads", url: "/leads", icon: UserRoundPlus },
+      { title: "Opportunities", url: "/opportunities", icon: Handshake },
       { title: "Sales Orders", url: "/salesorders", icon: ShoppingCart },
     ]
   },
@@ -52,6 +55,7 @@ const navGroups = [
   {
     label: "System",
     items: [
+      { title: "AI Copilot", url: "/copilot", icon: MessageSquare },
       { title: "Smart Transfer", url: "/smarttransfer", icon: Database },
       { title: "Administration", url: "/admin", icon: Settings },
     ]

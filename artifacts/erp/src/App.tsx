@@ -12,6 +12,12 @@ import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import CustomersList from "@/pages/crm/customers";
 import CustomerDetail from "@/pages/crm/customers/detail";
+import VendorsList from "@/pages/crm/vendors";
+import VendorDetail from "@/pages/crm/vendors/detail";
+import LeadsListPage from "@/pages/crm/leads";
+import LeadDetailPage from "@/pages/crm/leads/detail";
+import OpportunitiesPage from "@/pages/crm/opportunities";
+import OpportunityDetailPage from "@/pages/crm/opportunities/detail";
 import ItemsList from "@/pages/inventory/items";
 import ItemDetail from "@/pages/inventory/items/detail";
 import SalesOrdersList from "@/pages/sales/orders";
@@ -24,6 +30,7 @@ import InvoicingPage from "@/pages/invoicing";
 import QualityPage from "@/pages/quality";
 import PlanningPage from "@/pages/planning";
 import ServiceOrdersPage from "@/pages/service-orders";
+import CopilotPage from "@/pages/copilot";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,6 +56,12 @@ function Router() {
       {/* CRM */}
       <Route path="/customers" component={CustomersList} />
       <Route path="/customers/:id" component={CustomerDetail} />
+      <Route path="/vendors" component={VendorsList} />
+      <Route path="/vendors/:id" component={VendorDetail} />
+      <Route path="/leads" component={LeadsListPage} />
+      <Route path="/leads/:id" component={LeadDetailPage} />
+      <Route path="/opportunities" component={OpportunitiesPage} />
+      <Route path="/opportunities/:id" component={OpportunityDetailPage} />
       {/* Sales */}
       <Route path="/salesorders" component={SalesOrdersList} />
       {/* Planning & Purchasing */}
@@ -69,6 +82,7 @@ function Router() {
       <Route path="/invoices" component={InvoicingPage} />
       <Route path="/quality" component={QualityPage} />
       {/* System */}
+      <Route path="/copilot" component={CopilotPage} />
       <Route path="/smarttransfer"><PlaceholderPage title="Smart Transfer Engine" description="Data import, export, and ETL mapping." /></Route>
       <Route path="/admin"><PlaceholderPage title="Administration & Governance" description="Users, roles, permissions, and audit trail." /></Route>
       <Route component={NotFound} />

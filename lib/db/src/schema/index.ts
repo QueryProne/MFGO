@@ -12,3 +12,5 @@ export * from "./quality";
 export * from "./planning";
 export * from "./manufacturing-v2";
 export * from "./communications";
+export * from "./collaboration";
+export * from "./crm-funnel";

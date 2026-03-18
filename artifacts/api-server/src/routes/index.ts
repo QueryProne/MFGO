@@ -17,6 +17,10 @@ import smartTransferRouter from "./smarttransfer";
 import receivingRouter from "./receiving";
 import manufacturingV2Router from "./manufacturing-v2";
 import communicationsRouter from "./communications";
+import tasksRouter from "./tasks";
+import emailsRouter from "./emails";
+import chatRouter from "./chat";
+import crmExtensionsRouter from "./crm-extensions";
 
 const router: IRouter = Router();
 
@@ -55,5 +59,9 @@ router.use(smartTransferRouter);
 router.use(receivingRouter);
 router.use("/v2/manufacturing", manufacturingV2Router);
 router.use(communicationsRouter);
+router.use(tasksRouter);
+router.use(emailsRouter);
+router.use(chatRouter);
+router.use(crmExtensionsRouter);
 
 export default router;

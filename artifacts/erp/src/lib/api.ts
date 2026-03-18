@@ -204,3 +204,166 @@ export interface SearchResult {
   entity: string; id: string; number?: string; name?: string; status?: string;
   metadata?: { type: string };
 }
+
+export interface Task {
+  id: string;
+  entityType: string;
+  entityId: string;
+  relatedEntityType?: string | null;
+  relatedEntityId?: string | null;
+  title: string;
+  description?: string | null;
+  dueDate?: string | null;
+  status: "open" | "in_progress" | "done" | string;
+  priority: "low" | "medium" | "high" | "critical" | string;
+  assigneeId?: string | null;
+  createdBy?: string | null;
+  reminders?: Array<Record<string, unknown>>;
+  comments?: Array<Record<string, unknown>>;
+  metadata?: Record<string, unknown> | null;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SharedEmail {
+  id: string;
+  direction: string;
+  status: string;
+  subject: string;
+  bodyHtml?: string | null;
+  bodyText?: string | null;
+  fromAddress: string;
+  replyTo?: string | null;
+  messageId?: string | null;
+  inReplyTo?: string | null;
+  referencesHeader?: string | null;
+  conversationId?: string | null;
+  templateId?: string | null;
+  templateVersionId?: string | null;
+  providerName?: string | null;
+  providerMessageId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  queuedAt?: string | null;
+  sentAt?: string | null;
+  receivedAt?: string | null;
+  recipients?: Array<{
+    recipientType: "to" | "cc" | "bcc" | string;
+    emailAddress: string;
+    displayName?: string | null;
+    deliveryStatus?: string | null;
+  }>;
+  contextLinks?: Array<{
+    entityType: string;
+    entityId: string;
+    relatedEntityType?: string | null;
+    relatedEntityId?: string | null;
+    linkRole?: string | null;
+  }>;
+}
+
+export interface TimelineEntry {
+  id: string;
+  activityType: string;
+  sourceType: string;
+  sourceId?: string | null;
+  title: string;
+  body?: string | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface Lead {
+  id: string;
+  number: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  companyName: string;
+  email?: string | null;
+  phone?: string | null;
+  source?: string | null;
+  status: string;
+  ownerId?: string | null;
+  notes?: string | null;
+  convertedCustomerId?: string | null;
+  convertedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  latestScore?: {
+    id: string;
+    score: number;
+    confidence?: number | null;
+    reasoning?: string | null;
+    createdAt: string;
+  } | null;
+}
+
+export interface Opportunity {
+  id: string;
+  number: string;
+  name: string;
+  stage: string;
+  status: string;
+  amount: string;
+  probability: number;
+  expectedCloseDate?: string | null;
+  customerId?: string | null;
+  vendorId?: string | null;
+  leadId?: string | null;
+  ownerId?: string | null;
+  notes?: string | null;
+  wonReason?: string | null;
+  lostReason?: string | null;
+  closedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  stageHistory?: Array<{
+    id: string;
+    fromStage?: string | null;
+    toStage: string;
+    changedBy?: string | null;
+    note?: string | null;
+    changedAt: string;
+  }>;
+}
+
+export interface AutomationRule {
+  id: string;
+  name: string;
+  description?: string | null;
+  triggerEvent: string;
+  conditionJson: Record<string, unknown>;
+  actionJson: Record<string, unknown>;
+  isActive: boolean;
+  lastRunAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OpportunityForecast {
+  totals: {
+    pipelineAmount: number;
+    weightedAmount: number;
+    openCount: number;
+    wonCount: number;
+    lostCount: number;
+  };
+  stages: Array<{
+    stage: string;
+    status: string;
+    count: number;
+    amount: string;
+    weightedAmount: string;
+  }>;
+  snapshot: {
+    id: string;
+    snapshotLabel: string;
+    weightedAmount: string;
+    pipelineAmount: string;
+    openCount: number;
+    wonCount: number;
+    lostCount: number;
+    createdAt: string;
+  };
+}
