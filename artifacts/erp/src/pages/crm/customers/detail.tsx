@@ -1,425 +1,131 @@
-import { useRoute, Link } from "wouter";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { api, type Customer, type CustomerAddress, type CustomerContact, type SalesOrder } from "@/lib/api";
-import { Badge } from "@/components/ui/badge";
+import { useParams } from "wouter";
+import { useGetCustomer } from "@workspace/api-client-react";
+import { PageHeader, StatusBadge } from "@/components/ui-patterns";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
-import {
-  Users, ArrowLeft, Mail, Phone, Globe, MapPin, Star,
-  CreditCard, ClipboardList, Plus, Trash2, User, Building2,
-} from "lucide-react";
-
-function Field({ label, children }: { label: string; children?: React.ReactNode }) {
-  return (
-    <div className="space-y-0.5">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60">{label}</div>
-      <div className="text-sm text-foreground">{children || "—"}</div>
-    </div>
-  );
-}
-
-const STATUS_COLOR: Record<string, string> = {
-  active:   "bg-emerald-900/60 text-emerald-200",
-  inactive: "bg-zinc-700 text-zinc-300",
-  prospect: "bg-blue-900/60 text-blue-200",
-  hold:     "bg-red-900/60 text-red-200",
-};
-const SO_STATUS_COLOR: Record<string, string> = {
-  draft:     "bg-zinc-700 text-zinc-300",
-  confirmed: "bg-blue-900/60 text-blue-200",
-  partial:   "bg-amber-900/60 text-amber-200",
-  shipped:   "bg-emerald-900/60 text-emerald-200",
-  closed:    "bg-zinc-800 text-zinc-400",
-};
-
-function AddressCard({ addr, onDelete }: { addr: CustomerAddress; onDelete: () => void }) {
-  return (
-    <div className="bg-muted/20 border border-border rounded-lg p-3 space-y-1 relative group">
-      {addr.isDefault && (
-        <Badge className="absolute top-2 right-2 text-[10px] bg-primary/20 text-primary border border-primary/30">Default</Badge>
-      )}
-      <div className="text-xs font-semibold uppercase text-muted-foreground/70 tracking-wide">
-        {addr.addressType.replace("_", " ")}
-      </div>
-      {addr.name && <div className="text-sm font-medium text-foreground">{addr.name}</div>}
-      <div className="text-sm text-muted-foreground">
-        <div>{addr.line1}</div>
-        {addr.line2 && <div>{addr.line2}</div>}
-        <div>{[addr.city, addr.state, addr.postalCode].filter(Boolean).join(", ")} {addr.country}</div>
-      </div>
-      <button
-        onClick={onDelete}
-        className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-400"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
-    </div>
-  );
-}
-
-function ContactRow({ contact, onDelete }: { contact: CustomerContact; onDelete: () => void }) {
-  return (
-    <TableRow className="border-border hover:bg-muted/20 group">
-      <TableCell>
-        <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-medium text-primary">
-            {contact.firstName[0]}{contact.lastName[0]}
-          </div>
-          <div>
-            <div className="text-sm font-medium text-foreground">
-              {contact.firstName} {contact.lastName}
-              {contact.isPrimary && <Star className="inline h-3 w-3 ml-1 text-amber-400 fill-amber-400" />}
-            </div>
-            {contact.title && <div className="text-xs text-muted-foreground">{contact.title}</div>}
-          </div>
-        </div>
-      </TableCell>
-      <TableCell className="text-xs text-muted-foreground">{contact.department ?? "—"}</TableCell>
-      <TableCell>
-        {contact.email ? (
-          <a href={`mailto:${contact.email}`} className="text-xs text-primary hover:underline">{contact.email}</a>
-        ) : <span className="text-xs text-muted-foreground">—</span>}
-      </TableCell>
-      <TableCell className="text-xs text-muted-foreground">{contact.phone ?? "—"}</TableCell>
-      <TableCell>
-        <div className="flex gap-1 flex-wrap">
-          {contact.isSalesContact && <Badge className="text-[10px] bg-blue-900/40 text-blue-300">Sales</Badge>}
-          {contact.isAccountingContact && <Badge className="text-[10px] bg-amber-900/40 text-amber-300">Accounting</Badge>}
-          {contact.isServiceContact && <Badge className="text-[10px] bg-purple-900/40 text-purple-300">Service</Badge>}
-        </div>
-      </TableCell>
-      <TableCell className="text-right">
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400"
-          onClick={onDelete}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      </TableCell>
-    </TableRow>
-  );
-}
+import { Mail, Phone, MapPin, CreditCard, Clock, FileText, ShoppingCart } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CustomerDetail() {
-  const [, params] = useRoute("/customers/:id");
-  const { toast } = useToast();
-  const qc = useQueryClient();
-  const [tab, setTab] = useState("overview");
+  const { id } = useParams();
+  const { data: customer, isLoading, error } = useGetCustomer(id || "", { query: { enabled: !!id } });
 
-  const { data: customer, isLoading } = useQuery<Customer>({
-    queryKey: ["customer", params?.id],
-    queryFn: () => api.get(`/customers/${params!.id}`),
-    enabled: !!params?.id,
-  });
-
-  const deleteAddr = useMutation({
-    mutationFn: (addrId: string) => api.delete(`/customers/${params!.id}/addresses/${addrId}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["customer", params?.id] }); toast({ title: "Address removed" }); },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const deleteContact = useMutation({
-    mutationFn: (cid: string) => api.delete(`/customers/${params!.id}/contacts/${cid}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["customer", params?.id] }); toast({ title: "Contact removed" }); },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  if (isLoading) return (
-    <div className="flex items-center justify-center h-full">
-      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-primary" />
-    </div>
-  );
-  if (!customer) return <div className="p-8 text-muted-foreground">Customer not found.</div>;
-
-  const addresses = customer.addresses ?? [];
-  const contacts = customer.contacts ?? [];
-  const recentOrders = customer.recentOrders ?? [];
-
-  const creditUsed = Number(customer.creditUsed ?? 0);
-  const creditLimit = Number(customer.creditLimit ?? 0);
-  const creditPct = creditLimit > 0 ? Math.min((creditUsed / creditLimit) * 100, 100) : 0;
-
-  return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-4 px-6 py-4 border-b border-border bg-card/40">
-        <Link to="/customers">
-          <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" /> Customers
-          </Button>
-        </Link>
-        <div className="h-4 w-px bg-border" />
-        <div className="flex items-center gap-3 flex-1">
-          <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
-            <Building2 className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-lg font-semibold font-display text-foreground">{customer.name}</h1>
-            <p className="text-xs text-muted-foreground font-mono">{customer.number} · {customer.type}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge className={cn("text-xs", STATUS_COLOR[customer.status] ?? "bg-zinc-700 text-zinc-200")}>
-            {customer.status}
-          </Badge>
-          <Button size="sm" variant="outline">Edit</Button>
-          <Link to="/salesorders">
-            <Button size="sm" className="gap-1.5">
-              <Plus className="h-3.5 w-3.5" /> New Order
-            </Button>
-          </Link>
+  if (isLoading) {
+    return (
+      <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+        <Skeleton className="h-10 w-1/3 mb-2" />
+        <Skeleton className="h-4 w-1/4 mb-8" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Skeleton className="h-[200px] rounded-xl" />
+          <Skeleton className="h-[200px] md:col-span-2 rounded-xl" />
         </div>
       </div>
+    );
+  }
 
-      {/* Tabs */}
-      <div className="flex-1 overflow-hidden flex flex-col">
-        <Tabs value={tab} onValueChange={setTab} className="flex flex-col flex-1 overflow-hidden">
-          <TabsList className="mx-6 mt-3 mb-0 self-start bg-muted/30 border border-border/50">
-            <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
-            <TabsTrigger value="addresses" className="text-xs">
-              Addresses {addresses.length > 0 && <Badge variant="outline" className="ml-1 text-[10px] px-1">{addresses.length}</Badge>}
-            </TabsTrigger>
-            <TabsTrigger value="contacts" className="text-xs">
-              Contacts {contacts.length > 0 && <Badge variant="outline" className="ml-1 text-[10px] px-1">{contacts.length}</Badge>}
-            </TabsTrigger>
-            <TabsTrigger value="orders" className="text-xs">
-              Sales Orders {recentOrders.length > 0 && <Badge variant="outline" className="ml-1 text-[10px] px-1">{recentOrders.length}</Badge>}
-            </TabsTrigger>
-          </TabsList>
+  if (error || !customer) {
+    return <div className="p-8 text-center text-destructive">Failed to load customer</div>;
+  }
 
-          <div className="flex-1 overflow-auto p-6 pt-4">
-            {/* ── OVERVIEW ── */}
-            <TabsContent value="overview" className="space-y-4 mt-0">
-              <div className="grid grid-cols-3 gap-4">
-                {/* Contact Info */}
-                <div className="bg-card border border-border rounded-lg p-4 space-y-3">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Contact Info</h3>
-                  {customer.email && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Mail className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <a href={`mailto:${customer.email}`} className="text-primary hover:underline truncate">{customer.email}</a>
-                    </div>
-                  )}
-                  {customer.phone && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Phone className="h-3.5 w-3.5 shrink-0" />{customer.phone}
-                    </div>
-                  )}
-                  {customer.website && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Globe className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <a href={customer.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate">{customer.website}</a>
-                    </div>
-                  )}
-                  {customer.billingAddress && (
-                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                      <span className="text-xs leading-relaxed">{customer.billingAddress}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Financials */}
-                <div className="bg-card border border-border rounded-lg p-4 space-y-3">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 flex items-center gap-1.5">
-                    <CreditCard className="h-3.5 w-3.5" /> Financials
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Payment Terms">{customer.paymentTerms}</Field>
-                    <Field label="Currency">{customer.currency}</Field>
-                    <Field label="Credit Limit">{creditLimit > 0 ? `$${creditLimit.toLocaleString()}` : "—"}</Field>
-                    <Field label="Credit Used">{creditUsed > 0 ? `$${creditUsed.toLocaleString()}` : "$0"}</Field>
-                  </div>
-                  {creditLimit > 0 && (
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Credit Usage</span>
-                        <span className={cn(creditPct > 80 ? "text-red-400" : creditPct > 60 ? "text-amber-400" : "text-emerald-400")}>
-                          {creditPct.toFixed(0)}%
-                        </span>
-                      </div>
-                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className={cn("h-full rounded-full transition-all", creditPct > 80 ? "bg-red-500" : creditPct > 60 ? "bg-amber-500" : "bg-emerald-500")}
-                          style={{ width: `${creditPct}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Stats */}
-                <div className="bg-card border border-border rounded-lg p-4 space-y-3">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">Activity</h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Open Orders</span>
-                      <span className="text-sm font-medium tabular-nums text-foreground">
-                        {recentOrders.filter(o => !["closed", "cancelled"].includes(o.status)).length}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Total Orders</span>
-                      <span className="text-sm font-medium tabular-nums text-foreground">{recentOrders.length}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Contacts</span>
-                      <span className="text-sm font-medium tabular-nums text-foreground">{contacts.length}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Addresses</span>
-                      <span className="text-sm font-medium tabular-nums text-foreground">{addresses.length}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Primary contact preview */}
-              {contacts.filter(c => c.isPrimary).map(c => (
-                <div key={c.id} className="bg-card border border-border rounded-lg p-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 mb-3 flex items-center gap-1.5">
-                    <User className="h-3.5 w-3.5" /> Primary Contact
-                  </h3>
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-sm font-medium text-primary">
-                      {c.firstName[0]}{c.lastName[0]}
-                    </div>
-                    <div className="flex-1 grid grid-cols-4 gap-3">
-                      <Field label="Name">{c.firstName} {c.lastName}</Field>
-                      <Field label="Title">{c.title}</Field>
-                      <Field label="Email">{c.email ? <a href={`mailto:${c.email}`} className="text-primary hover:underline">{c.email}</a> : undefined}</Field>
-                      <Field label="Phone">{c.phone}</Field>
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {customer.notes && (
-                <div className="bg-card border border-border rounded-lg p-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 mb-2">Notes</h3>
-                  <p className="text-sm text-muted-foreground">{customer.notes}</p>
-                </div>
-              )}
-            </TabsContent>
-
-            {/* ── ADDRESSES ── */}
-            <TabsContent value="addresses" className="mt-0">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-foreground">Addresses ({addresses.length})</h3>
-                <Button size="sm" variant="outline" className="gap-1.5">
-                  <Plus className="h-3.5 w-3.5" /> Add Address
-                </Button>
-              </div>
-              {addresses.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground text-sm border border-dashed border-border rounded-lg">
-                  <MapPin className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                  No addresses on file.
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-3">
-                  {addresses.map(a => (
-                    <AddressCard key={a.id} addr={a} onDelete={() => deleteAddr.mutate(a.id)} />
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-
-            {/* ── CONTACTS ── */}
-            <TabsContent value="contacts" className="mt-0">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-foreground">Contacts ({contacts.length})</h3>
-                <Button size="sm" variant="outline" className="gap-1.5">
-                  <Plus className="h-3.5 w-3.5" /> Add Contact
-                </Button>
-              </div>
-              {contacts.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground text-sm border border-dashed border-border rounded-lg">
-                  <Users className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                  No contacts on file.
-                </div>
-              ) : (
-                <div className="bg-card border border-border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-border hover:bg-transparent">
-                        <TableHead className="text-xs text-muted-foreground">Name</TableHead>
-                        <TableHead className="text-xs text-muted-foreground">Department</TableHead>
-                        <TableHead className="text-xs text-muted-foreground">Email</TableHead>
-                        <TableHead className="text-xs text-muted-foreground">Phone</TableHead>
-                        <TableHead className="text-xs text-muted-foreground">Roles</TableHead>
-                        <TableHead className="w-10" />
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {contacts.map(c => (
-                        <ContactRow key={c.id} contact={c} onDelete={() => deleteContact.mutate(c.id)} />
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </TabsContent>
-
-            {/* ── SALES ORDERS ── */}
-            <TabsContent value="orders" className="mt-0">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-foreground">Recent Sales Orders</h3>
-                <Link to="/salesorders">
-                  <Button size="sm" variant="outline" className="gap-1.5">
-                    <Plus className="h-3.5 w-3.5" /> New Order
-                  </Button>
-                </Link>
-              </div>
-              {recentOrders.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground text-sm border border-dashed border-border rounded-lg">
-                  <ClipboardList className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                  No sales orders for this customer.
-                </div>
-              ) : (
-                <div className="bg-card border border-border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-border hover:bg-transparent">
-                        <TableHead className="text-xs text-muted-foreground">Order #</TableHead>
-                        <TableHead className="text-xs text-muted-foreground">Status</TableHead>
-                        <TableHead className="text-xs text-muted-foreground">Order Date</TableHead>
-                        <TableHead className="text-xs text-muted-foreground">Needed By</TableHead>
-                        <TableHead className="text-xs text-muted-foreground text-right">Total</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {recentOrders.map(so => (
-                        <TableRow key={so.id} className="border-border hover:bg-muted/20">
-                          <TableCell>
-                            <Link to={`/salesorders/${so.id}`} className="font-mono text-xs text-primary hover:underline">
-                              {so.number}
-                            </Link>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={cn("text-xs", SO_STATUS_COLOR[so.status] ?? "bg-zinc-700 text-zinc-300")}>
-                              {so.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{so.orderDate ?? "—"}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{so.requestedDate ?? "—"}</TableCell>
-                          <TableCell className="text-right text-sm tabular-nums text-foreground">
-                            {so.totalAmount ? `$${Number(so.totalAmount).toLocaleString()}` : "—"}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </TabsContent>
+  return (
+    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
+      <PageHeader 
+        title={customer.name}
+        description={`Customer ID: ${customer.number || customer.id}`}
+        backUrl="/customers"
+        action={
+          <div className="flex items-center gap-2">
+            <StatusBadge status={customer.status} />
+            <Button variant="outline" size="sm">Edit</Button>
+            <Button size="sm" className="shadow-md">New Order</Button>
           </div>
-        </Tabs>
+        }
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="space-y-6 lg:col-span-1">
+          <Card className="border-border/50 shadow-sm">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base font-display">Contact Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-start gap-3 text-sm">
+                <Mail className="w-4 h-4 text-muted-foreground mt-0.5" />
+                <div className="flex flex-col">
+                  <span className="font-medium">{customer.email || 'No email provided'}</span>
+                  <span className="text-xs text-muted-foreground">Primary Email</span>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 text-sm">
+                <Phone className="w-4 h-4 text-muted-foreground mt-0.5" />
+                <div className="flex flex-col">
+                  <span className="font-medium">{customer.phone || 'No phone provided'}</span>
+                  <span className="text-xs text-muted-foreground">Work Phone</span>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 text-sm">
+                <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
+                <div className="flex flex-col">
+                  <span className="font-medium">
+                    {customer.address?.line1 || 'No address'}<br/>
+                    {customer.address?.city && `${customer.address.city}, `}{customer.address?.state} {customer.address?.postalCode}
+                  </span>
+                  <span className="text-xs text-muted-foreground mt-1">Billing Address</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/50 shadow-sm">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base font-display">Financial Settings</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between text-sm border-b border-border/50 pb-2">
+                <span className="text-muted-foreground flex items-center gap-2"><CreditCard className="w-4 h-4"/> Credit Limit</span>
+                <span className="font-semibold">${(customer.creditLimit || 0).toLocaleString()}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm border-b border-border/50 pb-2">
+                <span className="text-muted-foreground flex items-center gap-2"><Clock className="w-4 h-4"/> Terms</span>
+                <span className="font-medium">{customer.paymentTerms || 'Net 30'}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-2"><FileText className="w-4 h-4"/> Tax ID</span>
+                <span className="font-mono text-xs">{customer.taxId || 'N/A'}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="lg:col-span-2">
+          <Tabs defaultValue="orders" className="w-full">
+            <TabsList className="grid w-full grid-cols-4 bg-secondary/50 p-1 rounded-lg">
+              <TabsTrigger value="orders">Orders</TabsTrigger>
+              <TabsTrigger value="quotes">Quotes</TabsTrigger>
+              <TabsTrigger value="invoices">Invoices</TabsTrigger>
+              <TabsTrigger value="contacts">Contacts</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="orders" className="mt-4 focus-visible:outline-none focus-visible:ring-0">
+              <Card className="border-border/50 shadow-sm min-h-[400px]">
+                <CardContent className="p-0">
+                  <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+                    <ShoppingCart className="w-10 h-10 text-muted-foreground/50 mb-4" />
+                    <h3 className="text-base font-semibold text-foreground">No recent orders</h3>
+                    <p className="text-sm text-muted-foreground max-w-sm mt-1 mb-4">This customer hasn't placed any orders yet.</p>
+                    <Button variant="outline" size="sm">Create Order</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            {/* Other tabs would follow similar pattern */}
+            <TabsContent value="quotes"><Card className="p-12 text-center text-muted-foreground border-border/50 shadow-sm min-h-[400px]">Quotes panel</Card></TabsContent>
+            <TabsContent value="invoices"><Card className="p-12 text-center text-muted-foreground border-border/50 shadow-sm min-h-[400px]">Invoices panel</Card></TabsContent>
+            <TabsContent value="contacts"><Card className="p-12 text-center text-muted-foreground border-border/50 shadow-sm min-h-[400px]">Contacts panel</Card></TabsContent>
+          </Tabs>
+        </div>
       </div>
     </div>
   );

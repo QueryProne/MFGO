@@ -15,6 +15,8 @@ import dashboardRouter from "./dashboard";
 import searchRouter from "./search";
 import smartTransferRouter from "./smarttransfer";
 import receivingRouter from "./receiving";
+import manufacturingV2Router from "./manufacturing-v2";
+import communicationsRouter from "./communications";
 
 const router: IRouter = Router();
 
@@ -51,5 +53,7 @@ router.use(dashboardRouter);
 router.use(searchRouter);
 router.use(smartTransferRouter);
 router.use(receivingRouter);
+router.use("/v2/manufacturing", manufacturingV2Router);
+router.use(communicationsRouter);
 
 export default router;

@@ -10,3 +10,5 @@ export * from "./production";
 export * from "./shipping";
 export * from "./quality";
 export * from "./planning";
+export * from "./manufacturing-v2";
+export * from "./communications";
