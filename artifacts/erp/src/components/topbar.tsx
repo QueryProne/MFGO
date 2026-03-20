@@ -1,10 +1,10 @@
-import { Search, Bell, Command, Settings } from "lucide-react";
+import { Bell, Settings } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTheme } from "./theme-provider";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "./ui/dropdown-menu";
+import { UniversalSearch } from "@/components/search/universal-search";
 
 export function Topbar() {
   const { theme, setTheme } = useTheme();
@@ -13,19 +13,7 @@ export function Topbar() {
     <header className="h-14 flex items-center justify-between px-4 border-b border-border/50 bg-background/80 backdrop-blur-md sticky top-0 z-50">
       <div className="flex items-center gap-4 flex-1">
         <SidebarTrigger className="hover-elevate" />
-        
-        <div className="max-w-md w-full relative hidden md:block">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input 
-            placeholder="Search quotes, orders, items..." 
-            className="w-full pl-9 h-9 bg-secondary/50 border-border/50 focus-visible:ring-primary/30 rounded-lg text-sm"
-          />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-            <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-border/50 bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-              <Command className="w-3 h-3" /> K
-            </kbd>
-          </div>
-        </div>
+        <UniversalSearch />
       </div>
 
       <div className="flex items-center gap-3">

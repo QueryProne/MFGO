@@ -9,6 +9,7 @@ import { EmailComposer } from "@/components/email/email-composer";
 import { TaskList } from "@/components/tasks/task-list";
 import { UnifiedActivityTimeline } from "@/components/activity/unified-activity-timeline";
 import { api, Vendor } from "@/lib/api";
+import { CustomFormsPanel } from "@/components/custom/custom-forms-panel";
 
 export default function VendorDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -49,10 +50,11 @@ export default function VendorDetailPage() {
 
         <div className="lg:col-span-2">
           <Tabs defaultValue="timeline" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 bg-secondary/40">
+            <TabsList className="grid w-full grid-cols-5 bg-secondary/40">
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
               <TabsTrigger value="tasks">Tasks</TabsTrigger>
               <TabsTrigger value="email">Email</TabsTrigger>
+              <TabsTrigger value="custom">Custom</TabsTrigger>
               <TabsTrigger value="copilot">Copilot</TabsTrigger>
             </TabsList>
             <TabsContent value="timeline" className="mt-4">
@@ -63,6 +65,9 @@ export default function VendorDetailPage() {
             </TabsContent>
             <TabsContent value="email" className="mt-4">
               <EmailComposer entityType="vendor" entityId={vendor.id} defaultTo={vendor.email || undefined} />
+            </TabsContent>
+            <TabsContent value="custom" className="mt-4">
+              <CustomFormsPanel entityType="vendor" entityId={vendor.id} />
             </TabsContent>
             <TabsContent value="copilot" className="mt-4">
               <AICopilotChat entityType="vendor" entityId={vendor.id} />

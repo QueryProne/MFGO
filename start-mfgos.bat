@@ -51,10 +51,10 @@ if errorlevel 1 (
 )
 
 echo [4/5] Starting API server on port %API_PORT%...
-start "MFGOS API" cmd /k "cd /d ""%ROOT%"" && set PORT=%API_PORT% && set DATABASE_URL=%DATABASE_URL% && corepack pnpm --filter @workspace/api-server run dev"
+start "MFGOS API" cmd /k "cd /d ""%ROOT%"" && set ""PORT=%API_PORT%"" && set ""DATABASE_URL=%DATABASE_URL%"" && corepack pnpm --filter @workspace/api-server run dev"
 
 echo [5/5] Starting ERP UI on port %UI_PORT%...
-start "MFGOS UI" cmd /k "cd /d ""%ROOT%"" && set PORT=%UI_PORT% && set BASE_PATH=%BASE_PATH% && set VITE_API_BASE_URL=http://localhost:%API_PORT% && corepack pnpm --filter @workspace/erp run dev"
+start "MFGOS UI" cmd /k "cd /d ""%ROOT%"" && set ""PORT=%UI_PORT%"" && set ""BASE_PATH=%BASE_PATH%"" && set ""VITE_API_BASE_URL=http://localhost:%API_PORT%"" && corepack pnpm --filter @workspace/erp run dev"
 
 echo.
 echo Startup commands launched.

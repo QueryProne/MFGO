@@ -31,6 +31,7 @@ import QualityPage from "@/pages/quality";
 import PlanningPage from "@/pages/planning";
 import ServiceOrdersPage from "@/pages/service-orders";
 import CopilotPage from "@/pages/copilot";
+import AdministrationPage from "@/pages/system/administration";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -83,8 +84,9 @@ function Router() {
       <Route path="/quality" component={QualityPage} />
       {/* System */}
       <Route path="/copilot" component={CopilotPage} />
+      <Route path="/custom-forms" component={AdministrationPage} />
       <Route path="/smarttransfer"><PlaceholderPage title="Smart Transfer Engine" description="Data import, export, and ETL mapping." /></Route>
-      <Route path="/admin"><PlaceholderPage title="Administration & Governance" description="Users, roles, permissions, and audit trail." /></Route>
+      <Route path="/admin" component={AdministrationPage} />
       <Route component={NotFound} />
     </Switch>
   );

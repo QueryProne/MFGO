@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { LoadingTable, EmptyState } from "@/components/ui-patterns";
 import { api, WorkOrder, WorkOrderMaterial } from "@/lib/api";
 import { format, parseISO } from "date-fns";
+import { CustomFormsPanel } from "@/components/custom/custom-forms-panel";
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -125,6 +126,7 @@ export default function WorkOrderDetailPage() {
           <TabsTrigger value="materials">Materials <span className="ml-1.5 text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">{materials.length}</span></TabsTrigger>
           <TabsTrigger value="operations">Operations <span className="ml-1.5 text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">{wo.operations?.length ?? 0}</span></TabsTrigger>
           <TabsTrigger value="details">Details</TabsTrigger>
+          <TabsTrigger value="custom">Custom</TabsTrigger>
         </TabsList>
 
         {/* MATERIALS TAB */}
@@ -262,6 +264,10 @@ export default function WorkOrderDetailPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="custom">
+          <CustomFormsPanel entityType="workorder" entityId={wo.id} />
         </TabsContent>
       </Tabs>
     </div>

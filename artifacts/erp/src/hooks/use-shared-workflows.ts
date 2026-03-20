@@ -10,6 +10,11 @@ import {
   SharedEmail,
   Task,
   TimelineEntry,
+  CustomDataType,
+  CustomField,
+  CustomForm,
+  EntityCustomFormLink,
+  CustomValueRow,
 } from "@/lib/api";
 
 export function useTasks(params?: {
@@ -260,6 +265,203 @@ export function useUpdateAutomationRuleMutation() {
     mutationFn: ({ id, ...payload }: Partial<AutomationRule> & { id: string }) => api.patch<AutomationRule>(`/automation-rules/${id}`, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["automation-rules"] });
+    },
+  });
+}
+
+export function useCustomDataTypes(params?: { search?: string; page?: number; limit?: number }) {
+  const query = new URLSearchParams();
+  if (params?.search) query.set("search", params.search);
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
+  return useQuery<PaginatedResponse<CustomDataType>>({
+    queryKey: ["custom-data-types", params ?? {}],
+    queryFn: () => api.get(`/custom/data-types${query.toString() ? `?${query.toString()}` : ""}`),
+  });
+}
+
+export function useCreateCustomDataTypeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Partial<CustomDataType> & { name: string }) => api.post<CustomDataType>("/custom/data-types", payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["custom-data-types"] }),
+  });
+}
+
+export function useUpdateCustomDataTypeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: Partial<CustomDataType> & { id: number }) => api.patch<CustomDataType>(`/custom/data-types/${id}`, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["custom-data-types"] }),
+  });
+}
+
+export function useDeleteCustomDataTypeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete<{ success: boolean }>(`/custom/data-types/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["custom-data-types"] }),
+  });
+}
+
+export function useBootstrapStandardDataTypesMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<{ success: boolean; inserted: number; totalStandard: number }>("/custom/data-types/bootstrap", {}),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["custom-data-types"] }),
+  });
+}
+
+export function useCustomFields(params?: { search?: string; dataTypeId?: number; isActive?: boolean; page?: number; limit?: number }) {
+  const query = new URLSearchParams();
+  if (params?.search) query.set("search", params.search);
+  if (params?.dataTypeId) query.set("dataTypeId", String(params.dataTypeId));
+  if (params?.isActive !== undefined) query.set("isActive", String(params.isActive));
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
+  return useQuery<PaginatedResponse<CustomField>>({
+    queryKey: ["custom-fields", params ?? {}],
+    queryFn: () => api.get(`/custom/fields${query.toString() ? `?${query.toString()}` : ""}`),
+  });
+}
+
+export function useCreateCustomFieldMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Partial<CustomField> & { name: string; dataTypeId: number }) => api.post<CustomField>("/custom/fields", payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["custom-fields"] });
+      queryClient.invalidateQueries({ queryKey: ["custom-forms"] });
+    },
+  });
+}
+
+export function useUpdateCustomFieldMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: Partial<CustomField> & { id: number }) => api.patch<CustomField>(`/custom/fields/${id}`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["custom-fields"] });
+      queryClient.invalidateQueries({ queryKey: ["custom-forms"] });
+    },
+  });
+}
+
+export function useDeleteCustomFieldMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete<{ success: boolean }>(`/custom/fields/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["custom-fields"] });
+      queryClient.invalidateQueries({ queryKey: ["custom-forms"] });
+    },
+  });
+}
+
+export function useCustomForms(params?: { search?: string; page?: number; limit?: number }) {
+  const query = new URLSearchParams();
+  if (params?.search) query.set("search", params.search);
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
+  return useQuery<PaginatedResponse<CustomForm>>({
+    queryKey: ["custom-forms", params ?? {}],
+    queryFn: () => api.get(`/custom/forms${query.toString() ? `?${query.toString()}` : ""}`),
+  });
+}
+
+export function useCreateCustomFormMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Partial<CustomForm> & { name: string }) => api.post<CustomForm>("/custom/forms", payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["custom-forms"] }),
+  });
+}
+
+export function useUpdateCustomFormMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: Partial<CustomForm> & { id: number }) => api.patch<CustomForm>(`/custom/forms/${id}`, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["custom-forms"] }),
+  });
+}
+
+export function useDeleteCustomFormMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete<{ success: boolean }>(`/custom/forms/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["custom-forms"] }),
+  });
+}
+
+export function useAddFieldToFormMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ formId, ...payload }: { formId: number; fieldId: number; section?: string; sortOrder?: number; isRequired?: boolean | null }) =>
+      api.post(`/custom/forms/${formId}/fields`, payload),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["custom-forms"] }),
+  });
+}
+
+export function useRemoveFieldFromFormMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ formId, mappingId }: { formId: number; mappingId: number }) => api.delete(`/custom/forms/${formId}/fields/${mappingId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["custom-forms"] }),
+  });
+}
+
+export function useEntityCustomForms(entityType: string, entityId: string, includeFields = true) {
+  const query = new URLSearchParams();
+  if (includeFields) query.set("includeFields", "true");
+  return useQuery<{ data: EntityCustomFormLink[] }>({
+    queryKey: ["entity-custom-forms", entityType, entityId, includeFields],
+    queryFn: () => api.get(`/custom/entities/${entityType}/${entityId}/forms${query.toString() ? `?${query.toString()}` : ""}`),
+    enabled: Boolean(entityType && entityId),
+  });
+}
+
+export function useAttachCustomFormToEntityMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ entityType, entityId, ...payload }: { entityType: string; entityId: string; formId: number; sortOrder?: number }) =>
+      api.post(`/custom/entities/${entityType}/${entityId}/forms`, payload),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["entity-custom-forms", variables.entityType, variables.entityId] });
+      queryClient.invalidateQueries({ queryKey: ["custom-forms"] });
+    },
+  });
+}
+
+export function useDetachCustomFormFromEntityMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ entityType, entityId, linkId }: { entityType: string; entityId: string; linkId: number }) =>
+      api.delete(`/custom/entities/${entityType}/${entityId}/forms/${linkId}`),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["entity-custom-forms", variables.entityType, variables.entityId] });
+    },
+  });
+}
+
+export function useEntityCustomValues(entityType: string, entityId: string, formId?: number) {
+  const query = new URLSearchParams();
+  if (formId) query.set("formId", String(formId));
+  return useQuery<{ data: CustomValueRow[] }>({
+    queryKey: ["entity-custom-values", entityType, entityId, formId ?? "all"],
+    queryFn: () => api.get(`/custom/entities/${entityType}/${entityId}/values${query.toString() ? `?${query.toString()}` : ""}`),
+    enabled: Boolean(entityType && entityId),
+  });
+}
+
+export function useSaveEntityCustomValuesMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ entityType, entityId, values }: { entityType: string; entityId: string; values: Array<{ fieldId: number; value: unknown }> }) =>
+      api.post(`/custom/entities/${entityType}/${entityId}/values`, { values }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["entity-custom-values", variables.entityType, variables.entityId] });
+      queryClient.invalidateQueries({ queryKey: ["entity-custom-forms", variables.entityType, variables.entityId] });
+      queryClient.invalidateQueries({ queryKey: ["timeline", variables.entityType, variables.entityId] });
     },
   });
 }

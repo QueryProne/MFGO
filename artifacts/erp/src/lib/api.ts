@@ -209,8 +209,23 @@ export interface WorkbenchItem {
 }
 
 export interface SearchResult {
-  entity: string; id: string; number?: string; name?: string; status?: string;
-  metadata?: { type: string };
+  entity: string;
+  id: string;
+  type?: string;
+  title?: string;
+  subtitle?: string;
+  href?: string;
+  score?: number;
+  number?: string;
+  name?: string;
+  status?: string;
+  metadata?: { type: string; [key: string]: unknown };
+}
+
+export interface SearchResponse {
+  results: SearchResult[];
+  total: number;
+  query: string;
 }
 
 export interface Task {
@@ -374,4 +389,88 @@ export interface OpportunityForecast {
     lostCount: number;
     createdAt: string;
   };
+}
+
+export interface CustomDataType {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string | null;
+  settings: Record<string, unknown>;
+  isSystem: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomField {
+  id: number;
+  name: string;
+  slug: string;
+  label?: string | null;
+  description?: string | null;
+  helpText?: string | null;
+  placeholder?: string | null;
+  dataTypeId: number;
+  dataTypeSlug?: string;
+  isRequired: boolean;
+  isActive: boolean;
+  defaultValue?: unknown;
+  options?: Array<Record<string, unknown>>;
+  settings?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomFormFieldView {
+  id?: number;
+  mappingId?: number;
+  formId: number;
+  fieldId: number;
+  sortOrder?: number;
+  section?: string | null;
+  isRequired?: boolean | null;
+  fieldRequired?: boolean;
+  fieldName?: string;
+  fieldSlug?: string;
+  fieldLabel?: string | null;
+  fieldOptions?: Array<Record<string, unknown>> | null;
+  fieldPlaceholder?: string | null;
+  fieldHelpText?: string | null;
+  dataTypeSlug?: string;
+  value?: unknown;
+  valueUpdatedAt?: string | null;
+}
+
+export interface CustomForm {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string | null;
+  settings?: Record<string, unknown>;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  fields?: CustomFormFieldView[];
+}
+
+export interface EntityCustomFormLink {
+  linkId: number;
+  formId: number;
+  sortOrder: number;
+  settings?: Record<string, unknown>;
+  formName?: string;
+  formSlug?: string;
+  fields?: CustomFormFieldView[];
+}
+
+export interface CustomValueRow {
+  id?: number;
+  entityType: string;
+  entityId: string;
+  fieldId: number;
+  value: unknown;
+  fieldName?: string;
+  fieldSlug?: string;
+  dataTypeSlug?: string;
+  updatedAt?: string;
 }

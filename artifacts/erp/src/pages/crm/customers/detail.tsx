@@ -10,6 +10,7 @@ import { TaskList } from "@/components/tasks/task-list";
 import { EmailComposer } from "@/components/email/email-composer";
 import { AICopilotChat } from "@/components/ai/ai-copilot-chat";
 import { UnifiedActivityTimeline } from "@/components/activity/unified-activity-timeline";
+import { CustomFormsPanel } from "@/components/custom/custom-forms-panel";
 
 export default function CustomerDetail() {
   const { id } = useParams();
@@ -109,11 +110,12 @@ export default function CustomerDetail() {
 
         <div className="lg:col-span-2">
           <Tabs defaultValue="orders" className="w-full">
-            <TabsList className="grid w-full grid-cols-5 bg-secondary/50 p-1 rounded-lg">
+            <TabsList className="grid w-full grid-cols-6 bg-secondary/50 p-1 rounded-lg">
               <TabsTrigger value="orders">Orders</TabsTrigger>
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
               <TabsTrigger value="tasks">Tasks</TabsTrigger>
               <TabsTrigger value="email">Email</TabsTrigger>
+              <TabsTrigger value="custom">Custom</TabsTrigger>
               <TabsTrigger value="copilot">Copilot</TabsTrigger>
             </TabsList>
             
@@ -138,6 +140,9 @@ export default function CustomerDetail() {
             </TabsContent>
             <TabsContent value="email" className="mt-4 focus-visible:outline-none focus-visible:ring-0">
               <EmailComposer entityType="customer" entityId={customer.id} defaultTo={customer.email || undefined} />
+            </TabsContent>
+            <TabsContent value="custom" className="mt-4 focus-visible:outline-none focus-visible:ring-0">
+              <CustomFormsPanel entityType="customer" entityId={customer.id} />
             </TabsContent>
             <TabsContent value="copilot" className="mt-4 focus-visible:outline-none focus-visible:ring-0">
               <AICopilotChat entityType="customer" entityId={customer.id} />

@@ -21,6 +21,7 @@ import tasksRouter from "./tasks";
 import emailsRouter from "./emails";
 import chatRouter from "./chat";
 import crmExtensionsRouter from "./crm-extensions";
+import customRouter from "./custom";
 
 const router: IRouter = Router();
 
@@ -63,5 +64,6 @@ router.use(tasksRouter);
 router.use(emailsRouter);
 router.use(chatRouter);
 router.use(crmExtensionsRouter);
+router.use(customRouter);
 
 export default router;

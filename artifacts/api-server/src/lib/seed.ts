@@ -11,6 +11,7 @@ import {
   commEmailConversationsTable, commEmailMessagesTable, commEmailRecipientsTable,
   commEmailContextLinksTable, commEmailTemplatesTable, commEmailTemplateVersionsTable,
   emailSequencesTable, emailSequenceStepsTable, emailSequenceEnrollmentsTable,
+  dataTypesTable,
 } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 
@@ -34,7 +35,25 @@ async function ensureSystemUserExists(): Promise<void> {
     .onConflictDoNothing();
 }
 
+async function ensureCustomDataTypes(): Promise<void> {
+  await db
+    .insert(dataTypesTable)
+    .values([
+      { name: "Text", slug: "text", description: "Single-line text value", settings: { maxLength: 255 }, isSystem: true },
+      { name: "Number", slug: "number", description: "Numeric value", settings: { precision: 15, scale: 4 }, isSystem: true },
+      { name: "Date", slug: "date", description: "Date value", settings: { format: "yyyy-MM-dd" }, isSystem: true },
+      { name: "Boolean", slug: "boolean", description: "True/false flag", settings: {}, isSystem: true },
+      { name: "Select", slug: "select", description: "Single select option list", settings: { allowCustom: false }, isSystem: true },
+      { name: "Multi Select", slug: "multi_select", description: "Multiple select options", settings: { allowCustom: false }, isSystem: true },
+      { name: "File", slug: "file", description: "File/object reference", settings: { maxSizeMb: 25 }, isSystem: true },
+      { name: "Rich Text", slug: "rich_text", description: "Formatted HTML/markdown content", settings: {}, isSystem: true },
+      { name: "JSON", slug: "json", description: "Structured JSON payload", settings: {}, isSystem: true },
+    ])
+    .onConflictDoNothing({ target: dataTypesTable.slug });
+}
+
 export async function seed() {
+  await ensureCustomDataTypes();
   const hasData = await tableHasRows(customersTable, customersTable.id);
   if (hasData) {
     await ensureSystemUserExists();
