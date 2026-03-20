@@ -13,6 +13,9 @@ import {
   CustomDataType,
   CustomField,
   CustomForm,
+  CustomFormDetailResponse,
+  CustomSavedSearch,
+  CustomSavedSearchRunResponse,
   EntityCustomFormLink,
   CustomValueRow,
 } from "@/lib/api";
@@ -369,6 +372,14 @@ export function useCustomForms(params?: { search?: string; page?: number; limit?
   });
 }
 
+export function useCustomFormDetail(formId?: number | null) {
+  return useQuery<CustomFormDetailResponse>({
+    queryKey: ["custom-form-detail", formId ?? "none"],
+    queryFn: () => api.get(`/custom/forms/${formId}`),
+    enabled: Boolean(formId),
+  });
+}
+
 export function useCreateCustomFormMutation() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -393,12 +404,90 @@ export function useDeleteCustomFormMutation() {
   });
 }
 
+export function useCustomFormSavedSearches(formId?: number | null) {
+  return useQuery<{ data: CustomSavedSearch[] }>({
+    queryKey: ["custom-form-searches", formId ?? "none"],
+    queryFn: () => api.get(`/custom/forms/${formId}/searches`),
+    enabled: Boolean(formId),
+  });
+}
+
+export function useCreateCustomFormSavedSearchMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      formId,
+      ...payload
+    }: {
+      formId: number;
+      name: string;
+      entityType: string;
+      description?: string | null;
+      queryText?: string | null;
+      columns?: number[];
+      settings?: Record<string, unknown>;
+      isActive?: boolean;
+    }) => api.post<CustomSavedSearch>(`/custom/forms/${formId}/searches`, payload),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["custom-form-searches", variables.formId] });
+      queryClient.invalidateQueries({ queryKey: ["custom-form-detail", variables.formId] });
+    },
+  });
+}
+
+export function useUpdateCustomFormSavedSearchMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      formId,
+      searchId,
+      ...payload
+    }: {
+      formId: number;
+      searchId: number;
+      name?: string;
+      entityType?: string;
+      description?: string | null;
+      queryText?: string | null;
+      columns?: number[];
+      settings?: Record<string, unknown>;
+      isActive?: boolean;
+    }) => api.patch<CustomSavedSearch>(`/custom/forms/${formId}/searches/${searchId}`, payload),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["custom-form-searches", variables.formId] });
+      queryClient.invalidateQueries({ queryKey: ["custom-form-detail", variables.formId] });
+    },
+  });
+}
+
+export function useDeleteCustomFormSavedSearchMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ formId, searchId }: { formId: number; searchId: number }) =>
+      api.delete<{ success: boolean }>(`/custom/forms/${formId}/searches/${searchId}`),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["custom-form-searches", variables.formId] });
+      queryClient.invalidateQueries({ queryKey: ["custom-form-detail", variables.formId] });
+    },
+  });
+}
+
+export function useRunCustomFormSavedSearchMutation() {
+  return useMutation({
+    mutationFn: ({ formId, searchId }: { formId: number; searchId: number }) =>
+      api.post<CustomSavedSearchRunResponse>(`/custom/forms/${formId}/searches/${searchId}/run`, {}),
+  });
+}
+
 export function useAddFieldToFormMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ formId, ...payload }: { formId: number; fieldId: number; section?: string; sortOrder?: number; isRequired?: boolean | null }) =>
       api.post(`/custom/forms/${formId}/fields`, payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["custom-forms"] }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["custom-forms"] });
+      queryClient.invalidateQueries({ queryKey: ["custom-form-detail", variables.formId] });
+    },
   });
 }
 
@@ -406,7 +495,10 @@ export function useRemoveFieldFromFormMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ formId, mappingId }: { formId: number; mappingId: number }) => api.delete(`/custom/forms/${formId}/fields/${mappingId}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["custom-forms"] }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["custom-forms"] });
+      queryClient.invalidateQueries({ queryKey: ["custom-form-detail", variables.formId] });
+    },
   });
 }
 

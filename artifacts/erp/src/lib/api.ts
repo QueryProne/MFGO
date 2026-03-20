@@ -453,6 +453,19 @@ export interface CustomForm {
   fields?: CustomFormFieldView[];
 }
 
+export interface CustomFormApplication {
+  linkId: number;
+  entityType: string;
+  entityId: string;
+  sortOrder: number;
+  settings?: Record<string, unknown>;
+}
+
+export interface CustomFormDetailResponse {
+  form: CustomForm & { fields: CustomFormFieldView[] };
+  applications: CustomFormApplication[];
+}
+
 export interface EntityCustomFormLink {
   linkId: number;
   formId: number;
@@ -473,4 +486,36 @@ export interface CustomValueRow {
   fieldSlug?: string;
   dataTypeSlug?: string;
   updatedAt?: string;
+}
+
+export interface CustomSavedSearch {
+  id: number;
+  formId: number;
+  name: string;
+  entityType: string;
+  description?: string | null;
+  queryText?: string | null;
+  columns: number[];
+  settings: Record<string, unknown>;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomSavedSearchRunRow {
+  id: number;
+  entityType: string;
+  entityId: string;
+  fieldId: number;
+  value: unknown;
+  updatedAt: string;
+  fieldName?: string | null;
+  fieldSlug?: string | null;
+  fieldLabel?: string | null;
+  dataTypeSlug?: string | null;
+}
+
+export interface CustomSavedSearchRunResponse {
+  search: CustomSavedSearch;
+  rows: CustomSavedSearchRunRow[];
 }

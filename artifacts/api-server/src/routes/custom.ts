@@ -6,6 +6,7 @@ import {
   customFieldsTable,
   customFormFieldsTable,
   customFormsTable,
+  customSavedSearchesTable,
   dataTypesTable,
   db,
   pageCustomFormsTable,
@@ -484,6 +485,62 @@ router.post("/custom/forms", async (req, res) => {
   }
 });
 
+router.get("/custom/forms/:id", async (req, res) => {
+  try {
+    const formId = parseId(String(req.params.id));
+    if (!formId) {
+      res.status(400).json({ error: "bad_request", message: "Invalid form id" });
+      return;
+    }
+
+    const [form] = await db.select().from(customFormsTable).where(eq(customFormsTable.id, formId)).limit(1);
+    if (!form) {
+      res.status(404).json({ error: "not_found", message: "Custom form not found" });
+      return;
+    }
+
+    const [fields, applications] = await Promise.all([
+      db
+        .select({
+          mappingId: customFormFieldsTable.id,
+          formId: customFormFieldsTable.formId,
+          fieldId: customFormFieldsTable.fieldId,
+          section: customFormFieldsTable.section,
+          sortOrder: customFormFieldsTable.sortOrder,
+          isRequired: customFormFieldsTable.isRequired,
+          fieldName: customFieldsTable.name,
+          fieldSlug: customFieldsTable.slug,
+          fieldLabel: customFieldsTable.label,
+          fieldOptions: customFieldsTable.options,
+          fieldPlaceholder: customFieldsTable.placeholder,
+          fieldHelpText: customFieldsTable.helpText,
+          fieldRequired: customFieldsTable.isRequired,
+          dataTypeSlug: dataTypesTable.slug,
+        })
+        .from(customFormFieldsTable)
+        .leftJoin(customFieldsTable, eq(customFormFieldsTable.fieldId, customFieldsTable.id))
+        .leftJoin(dataTypesTable, eq(customFieldsTable.dataTypeId, dataTypesTable.id))
+        .where(eq(customFormFieldsTable.formId, formId))
+        .orderBy(asc(customFormFieldsTable.sortOrder), asc(customFormFieldsTable.id)),
+      db
+        .select({
+          linkId: pageCustomFormsTable.id,
+          entityType: pageCustomFormsTable.entityType,
+          entityId: pageCustomFormsTable.entityId,
+          sortOrder: pageCustomFormsTable.sortOrder,
+          settings: pageCustomFormsTable.settings,
+        })
+        .from(pageCustomFormsTable)
+        .where(eq(pageCustomFormsTable.formId, formId))
+        .orderBy(asc(pageCustomFormsTable.entityType), asc(pageCustomFormsTable.entityId), asc(pageCustomFormsTable.sortOrder)),
+    ]);
+
+    res.json({ form: { ...form, fields }, applications });
+  } catch (error) {
+    res.status(500).json({ error: "error", message: String(error) });
+  }
+});
+
 router.patch("/custom/forms/:id", async (req, res) => {
   try {
     const id = parseId(String(req.params.id));
@@ -524,6 +581,241 @@ router.delete("/custom/forms/:id", async (req, res) => {
     }
     await db.delete(customFormsTable).where(eq(customFormsTable.id, id));
     res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "error", message: String(error) });
+  }
+});
+
+router.get("/custom/forms/:id/searches", async (req, res) => {
+  try {
+    const formId = parseId(String(req.params.id));
+    if (!formId) {
+      res.status(400).json({ error: "bad_request", message: "Invalid form id" });
+      return;
+    }
+
+    const searches = await db
+      .select()
+      .from(customSavedSearchesTable)
+      .where(eq(customSavedSearchesTable.formId, formId))
+      .orderBy(asc(customSavedSearchesTable.name));
+
+    res.json({ data: searches });
+  } catch (error) {
+    res.status(500).json({ error: "error", message: String(error) });
+  }
+});
+
+router.post("/custom/forms/:id/searches", async (req, res) => {
+  try {
+    const formId = parseId(String(req.params.id));
+    if (!formId) {
+      res.status(400).json({ error: "bad_request", message: "Invalid form id" });
+      return;
+    }
+    const [form] = await db.select().from(customFormsTable).where(eq(customFormsTable.id, formId)).limit(1);
+    if (!form) {
+      res.status(404).json({ error: "not_found", message: "Custom form not found" });
+      return;
+    }
+
+    const payload = req.body as {
+      name: string;
+      entityType: string;
+      description?: string | null;
+      queryText?: string | null;
+      columns?: Array<number>;
+      settings?: JsonObject;
+      isActive?: boolean;
+    };
+    const name = typeof payload.name === "string" ? payload.name.trim() : "";
+    const entityType = typeof payload.entityType === "string" ? payload.entityType.trim() : "";
+    if (!name || !entityType) {
+      res.status(400).json({ error: "bad_request", message: "name and entityType are required" });
+      return;
+    }
+
+    const [created] = await db
+      .insert(customSavedSearchesTable)
+      .values({
+        formId,
+        name,
+        entityType,
+        description: payload.description ?? null,
+        queryText: payload.queryText ?? null,
+        columns: Array.isArray(payload.columns) ? payload.columns.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0) : [],
+        settings: asObject(payload.settings),
+        isActive: payload.isActive ?? true,
+      })
+      .returning();
+
+    res.status(201).json(created);
+  } catch (error) {
+    res.status(400).json({ error: "bad_request", message: String(error) });
+  }
+});
+
+router.patch("/custom/forms/:id/searches/:searchId", async (req, res) => {
+  try {
+    const formId = parseId(String(req.params.id));
+    const searchId = parseId(String(req.params.searchId));
+    if (!formId || !searchId) {
+      res.status(400).json({ error: "bad_request", message: "Invalid form id or search id" });
+      return;
+    }
+
+    const [existing] = await db
+      .select()
+      .from(customSavedSearchesTable)
+      .where(and(eq(customSavedSearchesTable.id, searchId), eq(customSavedSearchesTable.formId, formId)))
+      .limit(1);
+    if (!existing) {
+      res.status(404).json({ error: "not_found", message: "Saved search not found" });
+      return;
+    }
+
+    const payload = req.body as {
+      name?: string;
+      entityType?: string;
+      description?: string | null;
+      queryText?: string | null;
+      columns?: Array<number>;
+      settings?: JsonObject;
+      isActive?: boolean;
+    };
+
+    const [updated] = await db
+      .update(customSavedSearchesTable)
+      .set({
+        name: payload.name !== undefined ? payload.name.trim() : existing.name,
+        entityType: payload.entityType !== undefined ? payload.entityType.trim() : existing.entityType,
+        description: payload.description !== undefined ? payload.description : existing.description,
+        queryText: payload.queryText !== undefined ? payload.queryText : existing.queryText,
+        columns:
+          payload.columns !== undefined
+            ? payload.columns.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0)
+            : (existing.columns as Array<number>),
+        settings: payload.settings !== undefined ? asObject(payload.settings) : (existing.settings as JsonObject),
+        isActive: payload.isActive ?? existing.isActive,
+        updatedAt: new Date(),
+      })
+      .where(eq(customSavedSearchesTable.id, searchId))
+      .returning();
+
+    res.json(updated);
+  } catch (error) {
+    res.status(400).json({ error: "bad_request", message: String(error) });
+  }
+});
+
+router.delete("/custom/forms/:id/searches/:searchId", async (req, res) => {
+  try {
+    const formId = parseId(String(req.params.id));
+    const searchId = parseId(String(req.params.searchId));
+    if (!formId || !searchId) {
+      res.status(400).json({ error: "bad_request", message: "Invalid form id or search id" });
+      return;
+    }
+
+    await db
+      .delete(customSavedSearchesTable)
+      .where(and(eq(customSavedSearchesTable.id, searchId), eq(customSavedSearchesTable.formId, formId)));
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "error", message: String(error) });
+  }
+});
+
+router.post("/custom/forms/:id/searches/:searchId/run", async (req, res) => {
+  try {
+    const formId = parseId(String(req.params.id));
+    const searchId = parseId(String(req.params.searchId));
+    if (!formId || !searchId) {
+      res.status(400).json({ error: "bad_request", message: "Invalid form id or search id" });
+      return;
+    }
+
+    const [search] = await db
+      .select()
+      .from(customSavedSearchesTable)
+      .where(and(eq(customSavedSearchesTable.id, searchId), eq(customSavedSearchesTable.formId, formId)))
+      .limit(1);
+    if (!search) {
+      res.status(404).json({ error: "not_found", message: "Saved search not found" });
+      return;
+    }
+
+    const formFields = await db
+      .select({
+        fieldId: customFormFieldsTable.fieldId,
+        fieldName: customFieldsTable.name,
+        fieldSlug: customFieldsTable.slug,
+        fieldLabel: customFieldsTable.label,
+        dataTypeSlug: dataTypesTable.slug,
+      })
+      .from(customFormFieldsTable)
+      .leftJoin(customFieldsTable, eq(customFormFieldsTable.fieldId, customFieldsTable.id))
+      .leftJoin(dataTypesTable, eq(customFieldsTable.dataTypeId, dataTypesTable.id))
+      .where(eq(customFormFieldsTable.formId, formId));
+
+    const formFieldIds = formFields.map((field) => field.fieldId);
+    if (formFieldIds.length === 0) {
+      res.json({ search, rows: [] });
+      return;
+    }
+
+    const configuredColumns = Array.isArray(search.columns)
+      ? (search.columns as Array<number>).filter((fieldId) => formFieldIds.includes(fieldId))
+      : [];
+    const selectedFieldIds = configuredColumns.length > 0 ? configuredColumns : formFieldIds;
+    const queryText = (search.queryText ?? "").trim().toLowerCase();
+
+    const rows = await db
+      .select({
+        id: customFieldValuesTable.id,
+        entityType: customFieldValuesTable.entityType,
+        entityId: customFieldValuesTable.entityId,
+        fieldId: customFieldValuesTable.fieldId,
+        value: customFieldValuesTable.value,
+        updatedAt: customFieldValuesTable.updatedAt,
+      })
+      .from(customFieldValuesTable)
+      .where(
+        and(
+          eq(customFieldValuesTable.entityType, search.entityType),
+          inArray(customFieldValuesTable.fieldId, selectedFieldIds),
+        ),
+      )
+      .orderBy(asc(customFieldValuesTable.entityId), asc(customFieldValuesTable.fieldId));
+
+    const fieldById = new Map(formFields.map((field) => [field.fieldId, field]));
+    const filteredRows =
+      queryText.length === 0
+        ? rows
+        : rows.filter((row) => {
+            const valueText = typeof row.value === "string" ? row.value : JSON.stringify(row.value ?? "");
+            const fieldMeta = fieldById.get(row.fieldId);
+            const fieldText = `${fieldMeta?.fieldLabel ?? ""} ${fieldMeta?.fieldName ?? ""} ${fieldMeta?.fieldSlug ?? ""}`.toLowerCase();
+            return (
+              row.entityId.toLowerCase().includes(queryText) ||
+              valueText.toLowerCase().includes(queryText) ||
+              fieldText.includes(queryText)
+            );
+          });
+
+    res.json({
+      search,
+      rows: filteredRows.map((row) => {
+        const field = fieldById.get(row.fieldId);
+        return {
+          ...row,
+          fieldName: field?.fieldName ?? null,
+          fieldSlug: field?.fieldSlug ?? null,
+          fieldLabel: field?.fieldLabel ?? null,
+          dataTypeSlug: field?.dataTypeSlug ?? null,
+        };
+      }),
+    });
   } catch (error) {
     res.status(500).json({ error: "error", message: String(error) });
   }
@@ -620,7 +912,7 @@ router.get("/custom/entities/:entityType/:entityId/forms", async (req, res) => {
       })
       .from(pageCustomFormsTable)
       .leftJoin(customFormsTable, eq(pageCustomFormsTable.formId, customFormsTable.id))
-      .where(and(eq(pageCustomFormsTable.entityType, entityType), eq(pageCustomFormsTable.pageId, entityId)))
+      .where(and(eq(pageCustomFormsTable.entityType, entityType), eq(pageCustomFormsTable.entityId, entityId)))
       .orderBy(asc(pageCustomFormsTable.sortOrder));
 
     const includeFields = asBoolean(req.query.includeFields) ?? true;
@@ -718,13 +1010,13 @@ router.post("/custom/entities/:entityType/:entityId/forms", async (req, res) => 
       .insert(pageCustomFormsTable)
       .values({
         entityType,
-        pageId: entityId,
+        entityId,
         formId,
         sortOrder: payload.sortOrder ?? 0,
         settings: asObject(payload.settings),
       })
       .onConflictDoUpdate({
-        target: [pageCustomFormsTable.entityType, pageCustomFormsTable.pageId, pageCustomFormsTable.formId],
+        target: [pageCustomFormsTable.entityType, pageCustomFormsTable.entityId, pageCustomFormsTable.formId],
         set: { sortOrder: payload.sortOrder ?? 0, settings: asObject(payload.settings), updatedAt: new Date() },
       })
       .returning();
@@ -745,7 +1037,7 @@ router.delete("/custom/entities/:entityType/:entityId/forms/:linkId", async (req
     }
     await db
       .delete(pageCustomFormsTable)
-      .where(and(eq(pageCustomFormsTable.id, linkId), eq(pageCustomFormsTable.entityType, entityType), eq(pageCustomFormsTable.pageId, entityId)));
+      .where(and(eq(pageCustomFormsTable.id, linkId), eq(pageCustomFormsTable.entityType, entityType), eq(pageCustomFormsTable.entityId, entityId)));
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: "error", message: String(error) });

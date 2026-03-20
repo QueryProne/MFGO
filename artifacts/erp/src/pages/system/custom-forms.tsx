@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link2, Plus, Trash2 } from "lucide-react";
+import { Link2, Plus, Search, Trash2 } from "lucide-react";
+import { useLocation } from "wouter";
 
 import { PageHeader } from "@/components/ui-patterns";
 import { Button } from "@/components/ui/button";
@@ -12,16 +13,23 @@ import { useToast } from "@/hooks/use-toast";
 import {
   useAddFieldToFormMutation,
   useAttachCustomFormToEntityMutation,
+  useCreateCustomFormSavedSearchMutation,
   useCreateCustomFieldMutation,
   useCreateCustomFormMutation,
+  useCustomFormDetail,
+  useCustomFormSavedSearches,
   useCustomDataTypes,
   useCustomFields,
   useCustomForms,
+  useDeleteCustomFormSavedSearchMutation,
   useDeleteCustomFieldMutation,
   useDeleteCustomFormMutation,
   useDetachCustomFormFromEntityMutation,
   useEntityCustomForms,
   useRemoveFieldFromFormMutation,
+  useRunCustomFormSavedSearchMutation,
+  useSaveEntityCustomValuesMutation,
+  useUpdateCustomFormSavedSearchMutation,
 } from "@/hooks/use-shared-workflows";
 import { CustomFormsPanel } from "@/components/custom/custom-forms-panel";
 
@@ -76,7 +84,89 @@ function extractFieldSourceTags(settings?: Record<string, unknown>): FieldSource
   return Array.from(byKey.values());
 }
 
+type QuickFieldTemplate = {
+  key: string;
+  name: string;
+  label: string;
+  description: string;
+  dataTypeSlug: string;
+  placeholder?: string;
+  options?: Array<Record<string, unknown>>;
+  settings?: Record<string, unknown>;
+};
+
+const QUICK_FIELD_TEMPLATES: QuickFieldTemplate[] = [
+  {
+    key: "short-text",
+    name: "Short Text",
+    label: "Short Text",
+    description: "Single-line free text field.",
+    dataTypeSlug: "text",
+    placeholder: "Enter value",
+  },
+  {
+    key: "long-text",
+    name: "Long Text",
+    label: "Long Text",
+    description: "Multi-line notes field.",
+    dataTypeSlug: "long_text",
+    placeholder: "Enter detailed notes",
+  },
+  {
+    key: "customer-id",
+    name: "Customer ID",
+    label: "Customer ID",
+    description: "Reference to customer master record ID.",
+    dataTypeSlug: "text",
+    placeholder: "CUS-0001",
+    settings: { entityTypes: ["customer", "salesorder", "invoice"], sourceTable: "customers" },
+  },
+  {
+    key: "vendor-id",
+    name: "Vendor ID",
+    label: "Vendor ID",
+    description: "Reference to vendor master record ID.",
+    dataTypeSlug: "text",
+    placeholder: "VND-0001",
+    settings: { entityTypes: ["vendor", "purchaseorder"], sourceTable: "vendors" },
+  },
+  {
+    key: "priority-select",
+    name: "Priority",
+    label: "Priority",
+    description: "Common priority selector.",
+    dataTypeSlug: "select",
+    options: [
+      { label: "Low", value: "low" },
+      { label: "Normal", value: "normal" },
+      { label: "High", value: "high" },
+      { label: "Critical", value: "critical" },
+    ],
+  },
+];
+
+function parseActiveFormFromLocation(location: string): number | null {
+  const query = location.split("?")[1] ?? "";
+  const params = new URLSearchParams(query);
+  const value = params.get("formId");
+  if (!value) return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function toEditableValue(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "";
+  }
+}
+
 export function CustomFormsAdminContent({ embedded = false }: { embedded?: boolean }) {
+  const [location, navigate] = useLocation();
   const { toast } = useToast();
   const { data: dataTypesData } = useCustomDataTypes({ limit: 400 });
   const { data: fieldsData } = useCustomFields({ limit: 500 });
@@ -89,6 +179,11 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
   const deleteForm = useDeleteCustomFormMutation();
   const addFieldToForm = useAddFieldToFormMutation();
   const removeFieldFromForm = useRemoveFieldFromFormMutation();
+  const createSavedSearch = useCreateCustomFormSavedSearchMutation();
+  const updateSavedSearch = useUpdateCustomFormSavedSearchMutation();
+  const deleteSavedSearch = useDeleteCustomFormSavedSearchMutation();
+  const runSavedSearch = useRunCustomFormSavedSearchMutation();
+  const saveEntityValues = useSaveEntityCustomValuesMutation();
 
   const attachForm = useAttachCustomFormToEntityMutation();
   const detachForm = useDetachCustomFormFromEntityMutation();
@@ -115,6 +210,35 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
   const [attachEntityId, setAttachEntityId] = useState("");
   const [attachFormId, setAttachFormId] = useState("");
 
+  const [savedSearchName, setSavedSearchName] = useState("");
+  const [savedSearchEntityType, setSavedSearchEntityType] = useState("customer");
+  const [savedSearchQueryText, setSavedSearchQueryText] = useState("");
+  const [savedSearchColumnsInput, setSavedSearchColumnsInput] = useState("");
+  const [activeSavedSearchId, setActiveSavedSearchId] = useState<number | null>(null);
+  const [searchRunRows, setSearchRunRows] = useState<
+    Array<{
+      id: number;
+      entityType: string;
+      entityId: string;
+      fieldId: number;
+      value: unknown;
+      updatedAt: string;
+      fieldName?: string | null;
+      fieldSlug?: string | null;
+      fieldLabel?: string | null;
+      dataTypeSlug?: string | null;
+    }>
+  >([]);
+  const [searchRowDrafts, setSearchRowDrafts] = useState<Record<number, string>>({});
+
+  const formIdFromLocation = useMemo(() => parseActiveFormFromLocation(location), [location]);
+
+  useEffect(() => {
+    if (formIdFromLocation) {
+      setActiveFormId(formIdFromLocation);
+    }
+  }, [formIdFromLocation]);
+
   useEffect(() => {
     if (!activeFormId && forms.length > 0) {
       setActiveFormId(forms[0].id);
@@ -125,6 +249,11 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
     () => forms.find((form) => form.id === activeFormId) ?? null,
     [forms, activeFormId],
   );
+  const { data: activeFormDetailData } = useCustomFormDetail(activeFormId ?? undefined);
+  const { data: formSavedSearchesData } = useCustomFormSavedSearches(activeFormId ?? undefined);
+  const formSavedSearches = formSavedSearchesData?.data ?? [];
+  const formApplications = activeFormDetailData?.applications ?? [];
+
   const fieldsGroupedByType = useMemo(() => {
     const groups = new Map<string, typeof fields>();
     for (const field of fields) {
@@ -181,6 +310,23 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
     [forms],
   );
 
+  useEffect(() => {
+    if (!activeFormId) return;
+    setAttachFormId(String(activeFormId));
+  }, [activeFormId]);
+
+  useEffect(() => {
+    if (!formSavedSearches.length) {
+      setActiveSavedSearchId(null);
+      setSearchRunRows([]);
+      setSearchRowDrafts({});
+      return;
+    }
+    if (!activeSavedSearchId || !formSavedSearches.some((row) => row.id === activeSavedSearchId)) {
+      setActiveSavedSearchId(formSavedSearches[0].id);
+    }
+  }, [activeSavedSearchId, formSavedSearches]);
+
   const hasAttachTarget = Boolean(attachEntityType && attachEntityId);
   const { data: attachedFormsData } = useEntityCustomForms(attachEntityType, attachEntityId, true);
   const attachedForms = attachedFormsData?.data ?? [];
@@ -206,6 +352,81 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
       });
       return undefined;
     }
+  };
+
+  const setDesignerForm = (formId: number | null) => {
+    setActiveFormId(formId);
+    const params = new URLSearchParams(location.split("?")[1] ?? "");
+    params.set("tab", "custom-forms");
+    if (formId) {
+      params.set("formId", String(formId));
+    } else {
+      params.delete("formId");
+    }
+    navigate(`/admin?${params.toString()}`);
+  };
+
+  const createTemplateField = (template: QuickFieldTemplate) => {
+    const matchingDataType = dataTypes.find((type) => type.slug === template.dataTypeSlug);
+    if (!matchingDataType) {
+      toast({
+        title: "Data type is missing",
+        description: `Required type "${template.dataTypeSlug}" is not available. Confirm standard data types are loaded.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createField.mutate({
+      name: template.name,
+      label: template.label,
+      placeholder: template.placeholder,
+      dataTypeId: matchingDataType.id,
+      options: template.options,
+      settings: template.settings,
+    });
+  };
+
+  const activeSavedSearch = useMemo(
+    () => formSavedSearches.find((row) => row.id === activeSavedSearchId) ?? null,
+    [formSavedSearches, activeSavedSearchId],
+  );
+
+  useEffect(() => {
+    if (!activeSavedSearch) return;
+    setSavedSearchName(activeSavedSearch.name);
+    setSavedSearchEntityType(activeSavedSearch.entityType);
+    setSavedSearchQueryText(activeSavedSearch.queryText ?? "");
+    setSavedSearchColumnsInput((activeSavedSearch.columns ?? []).join(", "));
+  }, [activeSavedSearch]);
+
+  const parseSavedSearchColumns = (value: string): number[] =>
+    value
+      .split(",")
+      .map((entry) => Number.parseInt(entry.trim(), 10))
+      .filter((entry) => Number.isInteger(entry) && entry > 0);
+
+  const parseRowValue = (value: string, dataTypeSlug?: string | null): unknown => {
+    const raw = value.trim();
+    if (!raw) return null;
+    if (dataTypeSlug === "number" || dataTypeSlug === "decimal" || dataTypeSlug === "currency" || dataTypeSlug === "percent") {
+      const parsed = Number(raw);
+      return Number.isNaN(parsed) ? raw : parsed;
+    }
+    if (dataTypeSlug === "boolean") {
+      const lowered = raw.toLowerCase();
+      if (lowered === "true") return true;
+      if (lowered === "false") return false;
+      return raw;
+    }
+    if (dataTypeSlug === "json") {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return raw;
+      }
+    }
+    return raw;
   };
 
   return (
@@ -242,9 +463,14 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
                       #{form.id} - {form.slug} - {(form.fields?.length ?? 0)} fields
                     </p>
                   </div>
-                  <a href={`#form-${form.id}`} className="text-xs text-primary hover:underline">
-                    Jump
-                  </a>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setDesignerForm(form.id)}
+                  >
+                    Open Designer
+                  </Button>
                 </div>
               ))}
             </div>
@@ -328,6 +554,25 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
               <Plus className="w-4 h-4" />
               Create Field
             </Button>
+
+            <div className="space-y-2 rounded-lg border border-border/50 bg-secondary/20 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quick Field Templates</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {QUICK_FIELD_TEMPLATES.map((template) => (
+                  <button
+                    key={template.key}
+                    type="button"
+                    className="rounded-md border border-border/60 bg-background/70 px-3 py-2 text-left hover:border-primary/60 transition-colors"
+                    onClick={() => createTemplateField(template)}
+                    disabled={createField.isPending}
+                  >
+                    <p className="text-sm font-medium">{template.label}</p>
+                    <p className="text-xs text-muted-foreground">{template.description}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {dataTypes.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 No data types available yet. Standard types load from the backend automatically.
@@ -409,15 +654,21 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
 
             <div className="rounded-lg border border-border/50 bg-secondary/20 p-3 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-[220px_1fr_160px_1fr] gap-2">
-                <Input
-                  value={activeForm ? String(activeForm.id) : ""}
-                  onChange={(event) => {
-                    const parsed = Number.parseInt(event.target.value, 10);
-                    setActiveFormId(Number.isNaN(parsed) ? null : parsed);
-                  }}
-                  placeholder="Active Form ID"
-                  className="bg-background"
-                />
+                <Select
+                  value={activeFormId ? String(activeFormId) : ""}
+                  onValueChange={(next) => setDesignerForm(next ? Number.parseInt(next, 10) : null)}
+                >
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Select form to design" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {forms.map((form) => (
+                      <SelectItem key={form.id} value={String(form.id)}>
+                        #{form.id} {form.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Input
                   value={formFieldSection}
                   onChange={(event) => setFormFieldSection(event.target.value)}
@@ -443,6 +694,18 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
                   </SelectContent>
                 </Select>
               </div>
+              {activeForm ? (
+                <div className="rounded-md border border-border/60 bg-background/70 px-3 py-2">
+                  <p className="text-sm font-medium">
+                    Designer: {activeForm.name} <span className="text-muted-foreground">({activeForm.slug})</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Form ID {activeForm.id} - {(activeFormDetailData?.form.fields?.length ?? activeForm.fields?.length ?? 0)} mapped fields
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Select a form to continue building the raw form layout.</p>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
                 <Select value={selectedFieldId} onValueChange={setSelectedFieldId}>
                   <SelectTrigger className="bg-background">
@@ -504,7 +767,7 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
                         variant="ghost"
                         size="sm"
                         className="h-7 px-2 text-xs"
-                        onClick={() => setActiveFormId(form.id)}
+                        onClick={() => setDesignerForm(form.id)}
                       >
                         Manage
                       </Button>
@@ -554,20 +817,214 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
 
         <Card className="border-border/50 shadow-sm xl:col-span-2">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-display">Entity Form Attachments</CardTitle>
+            <CardTitle className="text-base font-display">Saved Searches (Form Answers)</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {!activeForm ? (
+              <p className="text-sm text-muted-foreground">Select a form in the designer to manage answer searches.</p>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_180px] gap-2">
+                  <Input
+                    value={savedSearchName}
+                    onChange={(event) => setSavedSearchName(event.target.value)}
+                    placeholder="Search name (e.g. Open QA Flags)"
+                    className="bg-background"
+                  />
+                  <Input
+                    value={savedSearchEntityType}
+                    onChange={(event) => setSavedSearchEntityType(event.target.value)}
+                    placeholder="Entity type"
+                    className="bg-background"
+                  />
+                </div>
+                <Input
+                  value={savedSearchColumnsInput}
+                  onChange={(event) => setSavedSearchColumnsInput(event.target.value)}
+                  placeholder="Field IDs to show (comma-separated). Leave blank = all form fields."
+                  className="bg-background"
+                />
+                <Textarea
+                  value={savedSearchQueryText}
+                  onChange={(event) => setSavedSearchQueryText(event.target.value)}
+                  className="bg-background min-h-[76px]"
+                  placeholder="Optional free-text filter (matches entity id, field labels, and values)"
+                />
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    className="gap-2"
+                    disabled={!savedSearchName.trim() || !savedSearchEntityType.trim() || createSavedSearch.isPending}
+                    onClick={() => {
+                      if (!activeFormId) return;
+                      createSavedSearch.mutate(
+                        {
+                          formId: activeFormId,
+                          name: savedSearchName.trim(),
+                          entityType: savedSearchEntityType.trim(),
+                          queryText: savedSearchQueryText.trim() || null,
+                          columns: parseSavedSearchColumns(savedSearchColumnsInput),
+                        },
+                        {
+                          onSuccess: (created) => {
+                            setActiveSavedSearchId(created.id);
+                          },
+                        },
+                      );
+                    }}
+                  >
+                    <Plus className="w-4 h-4" />
+                    Create Search
+                  </Button>
+
+                  <Select
+                    value={activeSavedSearchId ? String(activeSavedSearchId) : ""}
+                    onValueChange={(value) => setActiveSavedSearchId(value ? Number.parseInt(value, 10) : null)}
+                  >
+                    <SelectTrigger className="w-[280px] bg-background">
+                      <SelectValue placeholder="Select saved search" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formSavedSearches.map((row) => (
+                        <SelectItem key={row.id} value={String(row.id)}>
+                          #{row.id} {row.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="gap-2"
+                    disabled={!activeFormId || !activeSavedSearchId || updateSavedSearch.isPending}
+                    onClick={() => {
+                      if (!activeFormId || !activeSavedSearchId) return;
+                      updateSavedSearch.mutate({
+                        formId: activeFormId,
+                        searchId: activeSavedSearchId,
+                        name: savedSearchName.trim(),
+                        entityType: savedSearchEntityType.trim(),
+                        queryText: savedSearchQueryText.trim() || null,
+                        columns: parseSavedSearchColumns(savedSearchColumnsInput),
+                      });
+                    }}
+                  >
+                    Update
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="gap-2 text-destructive hover:text-destructive"
+                    disabled={!activeFormId || !activeSavedSearchId || deleteSavedSearch.isPending}
+                    onClick={() => {
+                      if (!activeFormId || !activeSavedSearchId) return;
+                      deleteSavedSearch.mutate({
+                        formId: activeFormId,
+                        searchId: activeSavedSearchId,
+                      });
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    className="gap-2"
+                    disabled={!activeFormId || !activeSavedSearchId || runSavedSearch.isPending}
+                    onClick={() => {
+                      if (!activeFormId || !activeSavedSearchId) return;
+                      runSavedSearch.mutate(
+                        {
+                          formId: activeFormId,
+                          searchId: activeSavedSearchId,
+                        },
+                        {
+                          onSuccess: (result) => {
+                            setSearchRunRows(result.rows);
+                            setSearchRowDrafts(
+                              Object.fromEntries(result.rows.map((row) => [row.id, toEditableValue(row.value)])),
+                            );
+                          },
+                        },
+                      );
+                    }}
+                  >
+                    <Search className="w-4 h-4" />
+                    Run Search
+                  </Button>
+                </div>
+
+                {searchRunRows.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Run a saved search to view editable answer rows.</p>
+                ) : (
+                  <div className="space-y-2 max-h-[320px] overflow-auto pr-1">
+                    {searchRunRows.map((row) => (
+                      <div key={row.id} className="rounded-md border border-border/60 bg-background/70 p-3 space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-xs text-muted-foreground">
+                            {row.entityType}:{row.entityId} - {row.fieldLabel || row.fieldName || row.fieldSlug || `Field ${row.fieldId}`}
+                          </p>
+                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{row.dataTypeSlug || "text"}</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
+                          <Input
+                            value={searchRowDrafts[row.id] ?? ""}
+                            onChange={(event) =>
+                              setSearchRowDrafts((current) => ({ ...current, [row.id]: event.target.value }))
+                            }
+                            className="bg-background"
+                          />
+                          <Button
+                            size="sm"
+                            disabled={saveEntityValues.isPending}
+                            onClick={() => {
+                              const nextRaw = searchRowDrafts[row.id] ?? "";
+                              const parsedValue = parseRowValue(nextRaw, row.dataTypeSlug);
+                              saveEntityValues.mutate({
+                                entityType: row.entityType,
+                                entityId: row.entityId,
+                                values: [{ fieldId: row.fieldId, value: parsedValue }],
+                              });
+                            }}
+                          >
+                            Save Value
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/50 shadow-sm xl:col-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-display">Apply Form To Page / Entity</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {activeForm ? (
+              <p className="text-xs text-muted-foreground">
+                Active designer form: <span className="text-foreground font-medium">{activeForm.name}</span> (ID {activeForm.id})
+              </p>
+            ) : null}
+
             <div className="grid grid-cols-1 md:grid-cols-[180px_1fr_180px_auto] gap-2">
               <Input
                 value={attachEntityType}
                 onChange={(event) => setAttachEntityType(event.target.value)}
-                placeholder="Entity type"
+                placeholder="Entity type (customer, vendor, workorder...)"
                 className="bg-background"
               />
               <Input
                 value={attachEntityId}
                 onChange={(event) => setAttachEntityId(event.target.value)}
-                placeholder="Entity ID (UUID)"
+                placeholder="Entity ID"
                 className="bg-background"
               />
               <Input
@@ -594,7 +1051,7 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
                 }}
               >
                 <Link2 className="w-4 h-4" />
-                Attach
+                Apply To Page
               </Button>
             </div>
 
@@ -627,6 +1084,29 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
                 {attachedForms.length === 0 ? <p className="text-sm text-muted-foreground">No forms attached for this entity.</p> : null}
               </div>
             )}
+
+            {activeForm ? (
+              <div className="rounded-lg border border-border/50 bg-secondary/20 p-3 space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Current Form Applications</p>
+                {formApplications.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">This form has not been applied to any entity yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {formApplications.map((application) => (
+                      <div
+                        key={application.linkId}
+                        className="flex items-center justify-between rounded-md border border-border/60 bg-background/70 px-3 py-2"
+                      >
+                        <p className="text-sm">
+                          {application.entityType}:{application.entityId}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Sort {application.sortOrder}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </div>

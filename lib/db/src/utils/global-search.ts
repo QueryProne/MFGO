@@ -398,7 +398,7 @@ export async function globalSearch(
       id: String(row.id),
       title: row.name,
       subtitle: row.slug,
-      href: `/admin?tab=custom-forms#form-${row.id}`,
+      href: `/admin?tab=custom-forms&formId=${row.id}`,
       status: row.isActive ? "active" : "inactive",
       score: scoreComposite(searchTerm, row.name, row.slug),
       metadata: { type: "Form", slug: row.slug },

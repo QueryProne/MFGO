@@ -107,7 +107,7 @@ export const pageCustomFormsTable = pgTable(
   {
     id: serial("id").primaryKey(),
     entityType: varchar("entity_type", { length: 100 }).notNull().default("page"),
-    pageId: varchar("page_id", { length: 200 }).notNull(),
+    entityId: varchar("page_id", { length: 200 }).notNull(),
     formId: integer("form_id")
       .notNull()
       .references(() => customFormsTable.id, { onDelete: "cascade" }),
@@ -117,8 +117,8 @@ export const pageCustomFormsTable = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => ({
-    entityFormUnique: uniqueIndex("uq_page_custom_forms_entity_form").on(table.entityType, table.pageId, table.formId),
-    entitySortIdx: index("idx_page_custom_forms_entity_sort").on(table.entityType, table.pageId, table.sortOrder),
+    entityFormUnique: uniqueIndex("uq_page_custom_forms_entity_form").on(table.entityType, table.entityId, table.formId),
+    entitySortIdx: index("idx_page_custom_forms_entity_sort").on(table.entityType, table.entityId, table.sortOrder),
     formIdx: index("idx_page_custom_forms_form_id").on(table.formId),
   }),
 );
@@ -143,6 +143,31 @@ export const customFieldValuesTable = pgTable(
   }),
 );
 
+export const customSavedSearchesTable = pgTable(
+  "custom_saved_searches",
+  {
+    id: serial("id").primaryKey(),
+    formId: integer("form_id")
+      .notNull()
+      .references(() => customFormsTable.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 160 }).notNull(),
+    entityType: varchar("entity_type", { length: 100 }).notNull(),
+    description: text("description"),
+    queryText: text("query_text"),
+    columns: jsonb("columns").$type<Array<number>>().notNull().default([]),
+    settings: jsonb("settings").$type<Record<string, unknown>>().notNull().default({}),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    formIdx: index("idx_custom_saved_searches_form_id").on(table.formId),
+    entityIdx: index("idx_custom_saved_searches_entity_type").on(table.entityType),
+    activeIdx: index("idx_custom_saved_searches_is_active").on(table.isActive),
+    nameUniquePerForm: uniqueIndex("uq_custom_saved_searches_form_name").on(table.formId, table.name),
+  }),
+);
+
 export const dataTypesRelations = relations(dataTypesTable, ({ many }) => ({
   customFields: many(customFieldsTable),
 }));
@@ -159,6 +184,7 @@ export const customFieldsRelations = relations(customFieldsTable, ({ one, many }
 export const customFormsRelations = relations(customFormsTable, ({ many }) => ({
   fields: many(customFormFieldsTable),
   pageLinks: many(pageCustomFormsTable),
+  savedSearches: many(customSavedSearchesTable),
 }));
 
 export const customFormFieldsRelations = relations(customFormFieldsTable, ({ one }) => ({
@@ -186,12 +212,20 @@ export const customFieldValuesRelations = relations(customFieldValuesTable, ({ o
   }),
 }));
 
+export const customSavedSearchesRelations = relations(customSavedSearchesTable, ({ one }) => ({
+  form: one(customFormsTable, {
+    fields: [customSavedSearchesTable.formId],
+    references: [customFormsTable.id],
+  }),
+}));
+
 export type DataType = typeof dataTypesTable.$inferSelect;
 export type CustomField = typeof customFieldsTable.$inferSelect;
 export type CustomForm = typeof customFormsTable.$inferSelect;
 export type CustomFormField = typeof customFormFieldsTable.$inferSelect;
 export type PageCustomForm = typeof pageCustomFormsTable.$inferSelect;
 export type CustomFieldValue = typeof customFieldValuesTable.$inferSelect;
+export type CustomSavedSearch = typeof customSavedSearchesTable.$inferSelect;
 
 /*
 Schema push:
@@ -222,14 +256,14 @@ const rows = await db
     customFieldValuesTable,
     and(
       eq(customFieldValuesTable.entityType, pageCustomFormsTable.entityType),
-      eq(customFieldValuesTable.entityId, pageCustomFormsTable.pageId),
+      eq(customFieldValuesTable.entityId, pageCustomFormsTable.entityId),
       eq(customFieldValuesTable.fieldId, customFieldsTable.id),
     ),
   )
   .where(
     and(
       eq(pageCustomFormsTable.entityType, "page"),
-      eq(pageCustomFormsTable.pageId, "dashboard"),
+      eq(pageCustomFormsTable.entityId, "dashboard"),
     ),
   )
   .orderBy(pageCustomFormsTable.sortOrder, customFormFieldsTable.sortOrder);
