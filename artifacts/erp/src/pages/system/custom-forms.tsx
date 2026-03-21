@@ -14,7 +14,6 @@ import { useToast } from "@/hooks/use-toast";
 import {
   useAddFieldToFormMutation,
   useAttachCustomFormToEntityMutation,
-  useBootstrapStandardDataTypesMutation,
   useCreateCustomFormSavedSearchMutation,
   useCreateCustomFieldMutation,
   useCreateCustomFormMutation,
@@ -87,67 +86,6 @@ function extractFieldSourceTags(settings?: Record<string, unknown>): FieldSource
   return Array.from(byKey.values());
 }
 
-type QuickFieldTemplate = {
-  key: string;
-  name: string;
-  label: string;
-  description: string;
-  dataTypeSlug: string;
-  placeholder?: string;
-  options?: Array<Record<string, unknown>>;
-  settings?: Record<string, unknown>;
-};
-
-const QUICK_FIELD_TEMPLATES: QuickFieldTemplate[] = [
-  {
-    key: "short-text",
-    name: "Short Text",
-    label: "Short Text",
-    description: "Single-line free text field.",
-    dataTypeSlug: "text",
-    placeholder: "Enter value",
-  },
-  {
-    key: "long-text",
-    name: "Long Text",
-    label: "Long Text",
-    description: "Multi-line notes field.",
-    dataTypeSlug: "long_text",
-    placeholder: "Enter detailed notes",
-  },
-  {
-    key: "customer-id",
-    name: "Customer ID",
-    label: "Customer ID",
-    description: "Reference to customer master record ID.",
-    dataTypeSlug: "text",
-    placeholder: "CUS-0001",
-    settings: { entityTypes: ["customer", "salesorder", "invoice"], sourceTable: "customers" },
-  },
-  {
-    key: "vendor-id",
-    name: "Vendor ID",
-    label: "Vendor ID",
-    description: "Reference to vendor master record ID.",
-    dataTypeSlug: "text",
-    placeholder: "VND-0001",
-    settings: { entityTypes: ["vendor", "purchaseorder"], sourceTable: "vendors" },
-  },
-  {
-    key: "priority-select",
-    name: "Priority",
-    label: "Priority",
-    description: "Common priority selector.",
-    dataTypeSlug: "select",
-    options: [
-      { label: "Low", value: "low" },
-      { label: "Normal", value: "normal" },
-      { label: "High", value: "high" },
-      { label: "Critical", value: "critical" },
-    ],
-  },
-];
-
 const ENTITY_TYPE_OPTIONS = [
   { value: "page", label: "Page" },
   { value: "customer", label: "Customer" },
@@ -185,12 +123,10 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
   const [location, navigate] = useLocation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"builder" | "saved-searches">("builder");
-  const [didAttemptTypeBootstrap, setDidAttemptTypeBootstrap] = useState(false);
   const { data: dataTypesData } = useCustomDataTypes({ limit: 400 });
   const { data: fieldsData } = useCustomFields({ limit: 500 });
   const { data: formsData } = useCustomForms({ limit: 300 });
   const { data: pagesData } = useCustomPages({ isActive: true, limit: 300 });
-  const bootstrapDataTypes = useBootstrapStandardDataTypesMutation();
 
   const createField = useCreateCustomFieldMutation();
   const deleteField = useDeleteCustomFieldMutation();
@@ -267,24 +203,15 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
   }, [activeFormId, forms]);
 
   useEffect(() => {
-    if (dataTypes.length > 0) {
-      if (didAttemptTypeBootstrap) {
-        setDidAttemptTypeBootstrap(false);
-      }
+    if (dataTypes.length === 0) {
+      if (fieldDataTypeId) setFieldDataTypeId("");
       return;
     }
-    if (didAttemptTypeBootstrap || bootstrapDataTypes.isPending) return;
-    setDidAttemptTypeBootstrap(true);
-    bootstrapDataTypes.mutate(undefined, {
-      onError: () => {
-        toast({
-          title: "Unable to load standard data types",
-          description: "Confirm schema is pushed and API is connected to the correct database.",
-          variant: "destructive",
-        });
-      },
-    });
-  }, [bootstrapDataTypes.isPending, bootstrapDataTypes.mutate, dataTypes.length, didAttemptTypeBootstrap, toast]);
+    const exists = dataTypes.some((type) => String(type.id) === fieldDataTypeId);
+    if (!exists) {
+      setFieldDataTypeId(String(dataTypes[0].id));
+    }
+  }, [dataTypes, fieldDataTypeId]);
 
   const activeForm = useMemo(
     () => forms.find((form) => form.id === activeFormId) ?? null,
@@ -419,27 +346,6 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
       params.delete("formId");
     }
     navigate(`/admin?${params.toString()}`);
-  };
-
-  const createTemplateField = (template: QuickFieldTemplate) => {
-    const matchingDataType = dataTypes.find((type) => type.slug === template.dataTypeSlug);
-    if (!matchingDataType) {
-      toast({
-        title: "Data type is missing",
-        description: `Required type "${template.dataTypeSlug}" is not available. Confirm standard data types are loaded.`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    createField.mutate({
-      name: template.name,
-      label: template.label,
-      placeholder: template.placeholder,
-      dataTypeId: matchingDataType.id,
-      options: template.options,
-      settings: template.settings,
-    });
   };
 
   const activeSavedSearch = useMemo(
@@ -622,42 +528,10 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
               Create Field
             </Button>
 
-            <div className="space-y-2 rounded-lg border border-border/50 bg-secondary/20 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quick Field Templates</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {QUICK_FIELD_TEMPLATES.map((template) => (
-                  <button
-                    key={template.key}
-                    type="button"
-                    className="rounded-md border border-border/60 bg-background/70 px-3 py-2 text-left hover:border-primary/60 transition-colors"
-                    onClick={() => createTemplateField(template)}
-                    disabled={createField.isPending}
-                  >
-                    <p className="text-sm font-medium">{template.label}</p>
-                    <p className="text-xs text-muted-foreground">{template.description}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {dataTypes.length === 0 ? (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">
-                  No data types available yet. Standard types should load automatically from the backend.
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
-                  disabled={bootstrapDataTypes.isPending}
-                  onClick={() => {
-                    setDidAttemptTypeBootstrap(true);
-                    bootstrapDataTypes.mutate();
-                  }}
-                >
-                  Reload Standard Data Types
-                </Button>
-              </div>
+              <p className="text-xs text-muted-foreground">
+                No data types available yet.
+              </p>
             ) : null}
 
             <div className="space-y-2 max-h-[280px] overflow-auto pr-1">
@@ -789,24 +663,6 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
               ) : (
                 <p className="text-xs text-muted-foreground">Select a form to continue building the raw form layout.</p>
               )}
-              <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Field Templates</p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  {QUICK_FIELD_TEMPLATES.map((template) => (
-                    <Button
-                      key={`form-template-${template.key}`}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="justify-start text-xs"
-                      disabled={createField.isPending}
-                      onClick={() => createTemplateField(template)}
-                    >
-                      {template.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
               <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
                 <Select value={selectedFieldId} onValueChange={setSelectedFieldId}>
                   <SelectTrigger className="bg-background">
