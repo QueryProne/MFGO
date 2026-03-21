@@ -1,0 +1,68 @@
+MFGO Working Memory
+Last Updated: 2026-03-21
+
+Guardrails (Do Not Violate Without User Approval)
+- Preserve existing architecture and module boundaries.
+- Do not make drastic schema changes or destructive migrations without explicit approval.
+- Prefer additive, backwards-compatible updates.
+- Keep custom forms + fields + page assignment flows stable.
+
+Operational Notes
+- Primary local stack:
+  - API: http://localhost:3000
+  - UI:  http://localhost:5173
+  - Postgres: docker container `mfgos-pg` on localhost:55432
+- If UI shows many `/api/custom/*` 500 errors, verify API process is actually running on port 3000 first.
+- Vite proxy (`:5173/api/*`) returns 500 when backend target is down/unreachable.
+
+Current Known Behaviors
+- Custom data types are backend-seeded and auto-bootstrap from `/api/custom/data-types`.
+- Custom field creation requires selecting a data type and creates fields as required by default.
+- Forms can be attached to pages via:
+  - POST `/api/custom/entities/page/{pageId}/forms`
+  - Example pageId: `administration`
+
+Change Log
+[2026-03-21]
+1) Custom fields admin:
+   - Removed required toggle in create-field row.
+   - Forced `isRequired: true` on new custom fields.
+   - Added auto-bootstrap and retry behavior for data types in UI.
+2) Startup reliability:
+   - Updated `start-mfgos.bat` to:
+     - ensure DB is ready
+     - push schema
+     - start UI in a separate terminal
+     - run API in the current terminal so errors are visible immediately
+3) Apply-form validation:
+   - Verified API attach flow works:
+     - POST `/api/custom/entities/page/administration/forms` returns 201
+     - GET `/api/custom/entities/page/administration/forms` returns attached form list
+4) Apply-to-page hardening:
+   - Backend now normalizes entity type + entity ID for page links (`page`, lowercase page ID).
+   - GET/POST/DELETE page form-link routes handle page IDs case-insensitively.
+   - Frontend apply action now normalizes page ID and shows explicit success/error toast messages.
+5) Root cause found for repeated custom endpoint 500s:
+   - Vite proxy was returning 500 when API process was not up on port 3000.
+   - Updated `start-mfgos.bat` flow so API runs in the current terminal (visible errors), with UI in a separate terminal.
+6) Verification snapshot:
+   - API direct and Vite-proxied custom endpoints return 200 while stack is up.
+   - Apply-form flow returns 201 and attached link is visible through GET.
+7) Entity ID autocomplete (Apply Form section):
+   - Added endpoint: GET `/api/custom/entity-options/:entityType?search=&limit=`
+   - Supports: customer, vendor, item, workorder, production_order, salesorder, purchaseorder, lead, opportunity.
+   - UI now uses autocomplete + quick-pick chips for non-page entity types.
+   - If a selected type has no records, UI explains that no IDs exist yet.
+
+Debug Checklist (Custom Forms / Apply To Page)
+1) Confirm API health: GET `/api/communications/versions` on port 3000.
+2) Confirm data types endpoint: GET `/api/custom/data-types?limit=5`.
+3) Confirm pages endpoint: GET `/api/custom/pages?isActive=true&limit=20`.
+4) Confirm forms endpoint: GET `/api/custom/forms?limit=20`.
+5) Attach test:
+   - POST `/api/custom/entities/page/administration/forms` with body `{ "formId": <id>, "sortOrder": 0 }`
+6) Verify attach:
+   - GET `/api/custom/entities/page/administration/forms?includeFields=true`
+
+Next Rule For Future Updates
+- Before modifying custom-form related logic, read this file and append a dated change entry after changes are verified.

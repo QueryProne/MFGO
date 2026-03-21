@@ -12,6 +12,7 @@ import {
   TimelineEntry,
   CustomDataType,
   CustomAppPage,
+  CustomEntityOption,
   CustomField,
   CustomForm,
   CustomFormDetailResponse,
@@ -325,6 +326,21 @@ export function useCustomPages(params?: { search?: string; isActive?: boolean; p
   return useQuery<PaginatedResponse<CustomAppPage>>({
     queryKey: ["custom-pages", params ?? {}],
     queryFn: () => api.get(`/custom/pages${query.toString() ? `?${query.toString()}` : ""}`),
+  });
+}
+
+export function useCustomEntityOptions(
+  entityType: string,
+  params?: { search?: string; limit?: number },
+  enabled = true,
+) {
+  const query = new URLSearchParams();
+  if (params?.search) query.set("search", params.search);
+  if (params?.limit) query.set("limit", String(params.limit));
+  return useQuery<{ data: CustomEntityOption[]; meta: { entityType: string; total: number; limit: number; search?: string | null } }>({
+    queryKey: ["custom-entity-options", entityType, params ?? {}],
+    queryFn: () => api.get(`/custom/entity-options/${entityType}${query.toString() ? `?${query.toString()}` : ""}`),
+    enabled: enabled && Boolean(entityType),
   });
 }
 

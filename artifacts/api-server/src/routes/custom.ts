@@ -3,6 +3,7 @@ import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 
 import {
   appPagesTable,
+  customersTable,
   customFieldValuesTable,
   customFieldsTable,
   customFormFieldsTable,
@@ -10,13 +11,21 @@ import {
   customSavedSearchesTable,
   dataTypesTable,
   db,
+  itemsTable,
+  leadsTable,
+  opportunitiesTable,
   pageCustomFormsTable,
+  purchaseOrdersTable,
+  salesOrdersTable,
+  vendorsTable,
+  workOrdersTable,
 } from "@workspace/db";
 import { asBoolean, asString, parsePagination } from "../modules/communications/http";
 
 const router = Router();
 
 type JsonObject = Record<string, unknown>;
+type EntityOptionRow = { id: string; label: string; subtitle?: string | null };
 
 function parseId(raw: string): number | null {
   const id = Number(raw);
@@ -38,6 +47,15 @@ function asObject(value: unknown): JsonObject {
 
 function asArray(value: unknown): Array<Record<string, unknown>> {
   return Array.isArray(value) ? (value as Array<Record<string, unknown>>) : [];
+}
+
+function normalizeEntityType(raw: string): string {
+  return raw.trim().toLowerCase();
+}
+
+function normalizeEntityId(entityType: string, raw: string): string {
+  const trimmed = raw.trim();
+  return entityType === "page" ? trimmed.toLowerCase() : trimmed;
 }
 
 const STANDARD_DATA_TYPES: Array<{
@@ -217,6 +235,146 @@ router.post("/custom/pages/bootstrap", async (_req, res) => {
   try {
     const result = await bootstrapStandardAppPages();
     res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(500).json({ error: "error", message: String(error) });
+  }
+});
+
+router.get("/custom/entity-options/:entityType", async (req, res) => {
+  try {
+    const entityType = normalizeEntityType(String(req.params.entityType));
+    const limit = Math.max(1, Math.min(200, Number(asString(req.query.limit) ?? 50)));
+    const search = asString(req.query.search);
+    const term = search ? `%${search}%` : null;
+    let rows: EntityOptionRow[] = [];
+
+    switch (entityType) {
+      case "customer": {
+        rows = await db
+          .select({
+            id: customersTable.id,
+            label: sql<string>`coalesce(${customersTable.number}, '') || ' - ' || coalesce(${customersTable.name}, '')`,
+            subtitle: customersTable.status,
+          })
+          .from(customersTable)
+          .where(term ? or(ilike(customersTable.id, term), ilike(customersTable.number, term), ilike(customersTable.name, term)) : undefined)
+          .orderBy(asc(customersTable.name))
+          .limit(limit);
+        break;
+      }
+      case "vendor": {
+        rows = await db
+          .select({
+            id: vendorsTable.id,
+            label: sql<string>`coalesce(${vendorsTable.number}, '') || ' - ' || coalesce(${vendorsTable.name}, '')`,
+            subtitle: vendorsTable.status,
+          })
+          .from(vendorsTable)
+          .where(term ? or(ilike(vendorsTable.id, term), ilike(vendorsTable.number, term), ilike(vendorsTable.name, term)) : undefined)
+          .orderBy(asc(vendorsTable.name))
+          .limit(limit);
+        break;
+      }
+      case "item": {
+        rows = await db
+          .select({
+            id: itemsTable.id,
+            label: sql<string>`coalesce(${itemsTable.number}, '') || ' - ' || coalesce(${itemsTable.name}, '')`,
+            subtitle: itemsTable.status,
+          })
+          .from(itemsTable)
+          .where(term ? or(ilike(itemsTable.id, term), ilike(itemsTable.number, term), ilike(itemsTable.name, term)) : undefined)
+          .orderBy(asc(itemsTable.number))
+          .limit(limit);
+        break;
+      }
+      case "workorder":
+      case "production_order": {
+        rows = await db
+          .select({
+            id: workOrdersTable.id,
+            label: workOrdersTable.number,
+            subtitle: workOrdersTable.status,
+          })
+          .from(workOrdersTable)
+          .where(term ? or(ilike(workOrdersTable.id, term), ilike(workOrdersTable.number, term)) : undefined)
+          .orderBy(desc(workOrdersTable.createdAt))
+          .limit(limit);
+        break;
+      }
+      case "purchaseorder": {
+        rows = await db
+          .select({
+            id: purchaseOrdersTable.id,
+            label: purchaseOrdersTable.number,
+            subtitle: purchaseOrdersTable.status,
+          })
+          .from(purchaseOrdersTable)
+          .where(term ? or(ilike(purchaseOrdersTable.id, term), ilike(purchaseOrdersTable.number, term)) : undefined)
+          .orderBy(desc(purchaseOrdersTable.createdAt))
+          .limit(limit);
+        break;
+      }
+      case "salesorder": {
+        rows = await db
+          .select({
+            id: salesOrdersTable.id,
+            label: salesOrdersTable.number,
+            subtitle: salesOrdersTable.status,
+          })
+          .from(salesOrdersTable)
+          .where(term ? or(ilike(salesOrdersTable.id, term), ilike(salesOrdersTable.number, term)) : undefined)
+          .orderBy(desc(salesOrdersTable.createdAt))
+          .limit(limit);
+        break;
+      }
+      case "lead": {
+        rows = await db
+          .select({
+            id: leadsTable.id,
+            label: sql<string>`coalesce(${leadsTable.number}, '') || ' - ' || coalesce(${leadsTable.companyName}, '')`,
+            subtitle: leadsTable.status,
+          })
+          .from(leadsTable)
+          .where(term ? or(ilike(leadsTable.id, term), ilike(leadsTable.number, term), ilike(leadsTable.companyName, term)) : undefined)
+          .orderBy(desc(leadsTable.createdAt))
+          .limit(limit);
+        break;
+      }
+      case "opportunity": {
+        rows = await db
+          .select({
+            id: opportunitiesTable.id,
+            label: sql<string>`coalesce(${opportunitiesTable.number}, '') || ' - ' || coalesce(${opportunitiesTable.name}, '')`,
+            subtitle: opportunitiesTable.status,
+          })
+          .from(opportunitiesTable)
+          .where(
+            term
+              ? or(ilike(opportunitiesTable.id, term), ilike(opportunitiesTable.number, term), ilike(opportunitiesTable.name, term))
+              : undefined,
+          )
+          .orderBy(desc(opportunitiesTable.createdAt))
+          .limit(limit);
+        break;
+      }
+      default: {
+        res.status(400).json({
+          error: "bad_request",
+          message: `Unsupported entity type "${entityType}" for autocomplete.`,
+        });
+        return;
+      }
+    }
+
+    res.json({
+      data: rows.map((row) => ({
+        id: row.id,
+        label: row.label,
+        subtitle: row.subtitle ?? null,
+      })),
+      meta: { entityType, total: rows.length, limit, search: search ?? null },
+    });
   } catch (error) {
     res.status(500).json({ error: "error", message: String(error) });
   }
@@ -1001,8 +1159,16 @@ router.delete("/custom/forms/:id/fields/:mappingId", async (req, res) => {
 
 router.get("/custom/entities/:entityType/:entityId/forms", async (req, res) => {
   try {
-    const entityType = String(req.params.entityType);
-    const entityId = String(req.params.entityId);
+    const entityType = normalizeEntityType(String(req.params.entityType));
+    const entityId = normalizeEntityId(entityType, String(req.params.entityId));
+    const entityWhereClause =
+      entityType === "page"
+        ? and(
+            sql`lower(${pageCustomFormsTable.entityType}) = ${entityType}`,
+            sql`lower(${pageCustomFormsTable.entityId}) = ${entityId}`,
+          )
+        : and(eq(pageCustomFormsTable.entityType, entityType), eq(pageCustomFormsTable.entityId, entityId));
+
     const links = await db
       .select({
         linkId: pageCustomFormsTable.id,
@@ -1019,7 +1185,7 @@ router.get("/custom/entities/:entityType/:entityId/forms", async (req, res) => {
       .from(pageCustomFormsTable)
       .leftJoin(appPagesTable, eq(pageCustomFormsTable.appPageId, appPagesTable.id))
       .leftJoin(customFormsTable, eq(pageCustomFormsTable.formId, customFormsTable.id))
-      .where(and(eq(pageCustomFormsTable.entityType, entityType), eq(pageCustomFormsTable.entityId, entityId)))
+      .where(entityWhereClause)
       .orderBy(asc(pageCustomFormsTable.sortOrder));
 
     const includeFields = asBoolean(req.query.includeFields) ?? true;
@@ -1103,9 +1269,8 @@ router.get("/custom/entities/:entityType/:entityId/forms", async (req, res) => {
 
 router.post("/custom/entities/:entityType/:entityId/forms", async (req, res) => {
   try {
-    const entityType = String(req.params.entityType);
-    const normalizedEntityType = entityType.trim().toLowerCase();
-    const entityId = String(req.params.entityId);
+    const entityType = normalizeEntityType(String(req.params.entityType));
+    const entityId = normalizeEntityId(entityType, String(req.params.entityId));
     const payload = req.body as { formId: number; sortOrder?: number; settings?: JsonObject };
     const formId = Number(payload.formId);
     const [form] = await db.select().from(customFormsTable).where(eq(customFormsTable.id, formId)).limit(1);
@@ -1115,7 +1280,7 @@ router.post("/custom/entities/:entityType/:entityId/forms", async (req, res) => 
     }
 
     let appPageId: number | null = null;
-    if (normalizedEntityType === "page") {
+    if (entityType === "page") {
       await bootstrapStandardAppPages();
       const [page] = await db.select().from(appPagesTable).where(eq(appPagesTable.pageId, entityId)).limit(1);
       if (!page) {
@@ -1151,16 +1316,28 @@ router.post("/custom/entities/:entityType/:entityId/forms", async (req, res) => 
 
 router.delete("/custom/entities/:entityType/:entityId/forms/:linkId", async (req, res) => {
   try {
-    const entityType = String(req.params.entityType);
-    const entityId = String(req.params.entityId);
+    const entityType = normalizeEntityType(String(req.params.entityType));
+    const entityId = normalizeEntityId(entityType, String(req.params.entityId));
     const linkId = parseId(String(req.params.linkId));
     if (!linkId) {
       res.status(400).json({ error: "bad_request", message: "Invalid link id" });
       return;
     }
-    await db
-      .delete(pageCustomFormsTable)
-      .where(and(eq(pageCustomFormsTable.id, linkId), eq(pageCustomFormsTable.entityType, entityType), eq(pageCustomFormsTable.entityId, entityId)));
+    if (entityType === "page") {
+      await db
+        .delete(pageCustomFormsTable)
+        .where(
+          and(
+            eq(pageCustomFormsTable.id, linkId),
+            sql`lower(${pageCustomFormsTable.entityType}) = ${entityType}`,
+            sql`lower(${pageCustomFormsTable.entityId}) = ${entityId}`,
+          ),
+        );
+    } else {
+      await db
+        .delete(pageCustomFormsTable)
+        .where(and(eq(pageCustomFormsTable.id, linkId), eq(pageCustomFormsTable.entityType, entityType), eq(pageCustomFormsTable.entityId, entityId)));
+    }
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: "error", message: String(error) });

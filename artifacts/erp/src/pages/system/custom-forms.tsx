@@ -7,19 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
   useAddFieldToFormMutation,
   useAttachCustomFormToEntityMutation,
+  useBootstrapStandardDataTypesMutation,
   useCreateCustomFormSavedSearchMutation,
   useCreateCustomFieldMutation,
   useCreateCustomFormMutation,
   useCustomFormDetail,
   useCustomFormSavedSearches,
   useCustomDataTypes,
+  useCustomEntityOptions,
   useCustomFields,
   useCustomForms,
   useCustomPages,
@@ -123,7 +124,12 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
   const [location, navigate] = useLocation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"builder" | "saved-searches">("builder");
-  const { data: dataTypesData } = useCustomDataTypes({ limit: 400 });
+  const {
+    data: dataTypesData,
+    error: dataTypesError,
+    refetch: refetchDataTypes,
+    isFetching: isFetchingDataTypes,
+  } = useCustomDataTypes({ limit: 400 });
   const { data: fieldsData } = useCustomFields({ limit: 500 });
   const { data: formsData } = useCustomForms({ limit: 300 });
   const { data: pagesData } = useCustomPages({ isActive: true, limit: 300 });
@@ -140,6 +146,7 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
   const deleteSavedSearch = useDeleteCustomFormSavedSearchMutation();
   const runSavedSearch = useRunCustomFormSavedSearchMutation();
   const saveEntityValues = useSaveEntityCustomValuesMutation();
+  const bootstrapStandardDataTypes = useBootstrapStandardDataTypesMutation();
 
   const attachForm = useAttachCustomFormToEntityMutation();
   const detachForm = useDetachCustomFormFromEntityMutation();
@@ -148,12 +155,13 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
   const fields = fieldsData?.data ?? [];
   const forms = formsData?.data ?? [];
   const pages = pagesData?.data ?? [];
+  const dataTypesErrorMessage = dataTypesError instanceof Error ? dataTypesError.message : null;
 
   const [fieldName, setFieldName] = useState("");
   const [fieldLabel, setFieldLabel] = useState("");
   const [fieldDataTypeId, setFieldDataTypeId] = useState("");
-  const [fieldIsRequired, setFieldIsRequired] = useState(false);
   const [fieldOptions, setFieldOptions] = useState("");
+  const [attemptedDataTypeBootstrap, setAttemptedDataTypeBootstrap] = useState(false);
 
   const [formName, setFormName] = useState("");
   const [formSlug, setFormSlug] = useState("");
@@ -166,6 +174,7 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
   const [attachEntityType, setAttachEntityType] = useState("customer");
   const [attachEntityId, setAttachEntityId] = useState("");
   const [attachFormId, setAttachFormId] = useState("");
+  const entityOptionListId = `entity-options-${attachEntityType}`;
 
   const [savedSearchName, setSavedSearchName] = useState("");
   const [savedSearchEntityType, setSavedSearchEntityType] = useState("customer");
@@ -201,6 +210,26 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
       setActiveFormId(forms[0].id);
     }
   }, [activeFormId, forms]);
+
+  useEffect(() => {
+    if (attemptedDataTypeBootstrap) return;
+    if (dataTypes.length > 0) return;
+    if (bootstrapStandardDataTypes.isPending) return;
+    setAttemptedDataTypeBootstrap(true);
+    bootstrapStandardDataTypes.mutate(undefined, {
+      onSuccess: () => {
+        void refetchDataTypes();
+      },
+    });
+  }, [attemptedDataTypeBootstrap, bootstrapStandardDataTypes, dataTypes.length, refetchDataTypes]);
+
+  useEffect(() => {
+    if (dataTypes.length > 0) return;
+    const intervalId = window.setInterval(() => {
+      void refetchDataTypes();
+    }, 3000);
+    return () => window.clearInterval(intervalId);
+  }, [dataTypes.length, refetchDataTypes]);
 
   useEffect(() => {
     if (dataTypes.length === 0) {
@@ -310,6 +339,15 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
   }, [activeSavedSearchId, formSavedSearches]);
 
   const hasAttachTarget = Boolean(attachEntityType && attachEntityId);
+  const { data: attachEntityOptionsData, isFetching: isFetchingAttachEntityOptions } = useCustomEntityOptions(
+    attachEntityType,
+    {
+      search: attachEntityType === "page" ? undefined : attachEntityId.trim() || undefined,
+      limit: 100,
+    },
+    attachEntityType !== "page",
+  );
+  const attachEntityOptions = attachEntityOptionsData?.data ?? [];
   const { data: attachedFormsData } = useEntityCustomForms(attachEntityType, attachEntityId, true);
   const attachedForms = attachedFormsData?.data ?? [];
 
@@ -474,7 +512,7 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
                 className="bg-background"
               />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
+            <div className="grid grid-cols-1 gap-2">
               <Select value={fieldDataTypeId} onValueChange={setFieldDataTypeId}>
                 <SelectTrigger className="bg-background">
                   <SelectValue placeholder="Select data type" />
@@ -487,10 +525,6 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
                   ))}
                 </SelectContent>
               </Select>
-              <div className="flex items-center justify-between rounded-md border border-border/50 px-3 py-2">
-                <span className="text-sm text-muted-foreground">Required</span>
-                <Switch checked={fieldIsRequired} onCheckedChange={setFieldIsRequired} />
-              </div>
             </div>
             <Textarea
               value={fieldOptions}
@@ -509,7 +543,7 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
                     name: fieldName.trim(),
                     label: fieldLabel.trim() || undefined,
                     dataTypeId: Number(fieldDataTypeId),
-                    isRequired: fieldIsRequired,
+                    isRequired: true,
                     options,
                   },
                   {
@@ -517,7 +551,6 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
                       setFieldName("");
                       setFieldLabel("");
                       setFieldDataTypeId("");
-                      setFieldIsRequired(false);
                       setFieldOptions("");
                     },
                   },
@@ -529,9 +562,26 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
             </Button>
 
             {dataTypes.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                No data types available yet.
-              </p>
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200 space-y-2">
+                <p>
+                  {dataTypesErrorMessage
+                    ? `Unable to load data types: ${dataTypesErrorMessage}`
+                    : isFetchingDataTypes
+                      ? "Loading data types..."
+                      : "Data types are not available yet."}
+                </p>
+                <p className="text-amber-100/80">Make sure API server and database are running, then retry.</p>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => {
+                    void refetchDataTypes();
+                  }}
+                >
+                  Retry Data Types
+                </Button>
+              </div>
             ) : null}
 
             <div className="space-y-2 max-h-[280px] overflow-auto pr-1">
@@ -1003,12 +1053,22 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
                   </SelectContent>
                 </Select>
               ) : (
-                <Input
-                  value={attachEntityId}
-                  onChange={(event) => setAttachEntityId(event.target.value)}
-                  placeholder="Entity ID"
-                  className="bg-background"
-                />
+                <div className="space-y-2">
+                  <Input
+                    list={entityOptionListId}
+                    value={attachEntityId}
+                    onChange={(event) => setAttachEntityId(event.target.value)}
+                    placeholder="Start typing ID, number, or name"
+                    className="bg-background"
+                  />
+                  <datalist id={entityOptionListId}>
+                    {attachEntityOptions.map((option) => (
+                      <option key={`${attachEntityType}-${option.id}`} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </datalist>
+                </div>
               )}
 
               <Select value={attachFormId} onValueChange={setAttachFormId}>
@@ -1032,12 +1092,39 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
                     toast({ title: "Invalid Form ID", description: "Use a numeric form ID.", variant: "destructive" });
                     return;
                   }
-                  attachForm.mutate({
-                    entityType: attachEntityType,
-                    entityId: attachEntityId,
-                    formId: parsedFormId,
-                    sortOrder: attachedForms.length,
-                  });
+                  const normalizedEntityId =
+                    attachEntityType === "page" ? attachEntityId.trim().toLowerCase() : attachEntityId.trim();
+                  if (!normalizedEntityId) {
+                    toast({ title: "Entity ID is required", variant: "destructive" });
+                    return;
+                  }
+                  attachForm.mutate(
+                    {
+                      entityType: attachEntityType,
+                      entityId: normalizedEntityId,
+                      formId: parsedFormId,
+                      sortOrder: attachedForms.length,
+                    },
+                    {
+                      onSuccess: () => {
+                        toast({
+                          title: "Form applied",
+                          description:
+                            attachEntityType === "page"
+                              ? `Form attached to page ID "${normalizedEntityId}".`
+                              : "Form attached to entity successfully.",
+                        });
+                      },
+                      onError: (error) => {
+                        const message = error instanceof Error ? error.message : "Unable to attach form to entity.";
+                        toast({
+                          title: "Apply failed",
+                          description: message,
+                          variant: "destructive",
+                        });
+                      },
+                    },
+                  );
                 }}
               >
                 <Link2 className="w-4 h-4" />
@@ -1048,7 +1135,33 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
               <p className="text-xs text-muted-foreground">
                 Available page IDs: {pages.length}. Choose a page ID to attach the selected form.
               </p>
-            ) : null}
+            ) : isFetchingAttachEntityOptions ? (
+              <p className="text-xs text-muted-foreground">Loading entity IDs for autocomplete...</p>
+            ) : attachEntityOptions.length === 0 ? (
+              <p className="text-xs text-amber-300">
+                No records currently exist for entity type "{attachEntityType}". Create at least one record first, then it will appear here.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Autocomplete is active. Start typing ID, number, or name, or choose a quick pick:
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {attachEntityOptions.slice(0, 12).map((option) => (
+                    <Button
+                      key={`${attachEntityType}-pick-${option.id}`}
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setAttachEntityId(option.id)}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {!hasAttachTarget ? (
               <p className="text-sm text-muted-foreground">Enter entity type and entity ID to manage attachments.</p>

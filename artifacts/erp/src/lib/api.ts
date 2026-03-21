@@ -496,6 +496,12 @@ export interface CustomAppPage {
   updatedAt: string;
 }
 
+export interface CustomEntityOption {
+  id: string;
+  label: string;
+  subtitle?: string | null;
+}
+
 export interface CustomValueRow {
   id?: number;
   entityType: string;
