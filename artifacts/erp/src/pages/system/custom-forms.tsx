@@ -251,7 +251,7 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
   );
   const { data: activeFormDetailData } = useCustomFormDetail(activeFormId ?? undefined);
   const { data: formSavedSearchesData } = useCustomFormSavedSearches(activeFormId ?? undefined);
-  const formSavedSearches = formSavedSearchesData?.data ?? [];
+  const formSavedSearches = useMemo(() => formSavedSearchesData?.data ?? [], [formSavedSearchesData?.data]);
   const formApplications = activeFormDetailData?.applications ?? [];
 
   const fieldsGroupedByType = useMemo(() => {
@@ -317,9 +317,11 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
 
   useEffect(() => {
     if (!formSavedSearches.length) {
-      setActiveSavedSearchId(null);
-      setSearchRunRows([]);
-      setSearchRowDrafts({});
+      if (activeSavedSearchId !== null) {
+        setActiveSavedSearchId(null);
+      }
+      setSearchRunRows((current) => (current.length === 0 ? current : []));
+      setSearchRowDrafts((current) => (Object.keys(current).length === 0 ? current : {}));
       return;
     }
     if (!activeSavedSearchId || !formSavedSearches.some((row) => row.id === activeSavedSearchId)) {
