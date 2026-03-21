@@ -11,6 +11,7 @@ import {
   Task,
   TimelineEntry,
   CustomDataType,
+  CustomAppPage,
   CustomField,
   CustomForm,
   CustomFormDetailResponse,
@@ -312,6 +313,18 @@ export function useBootstrapStandardDataTypesMutation() {
   return useMutation({
     mutationFn: () => api.post<{ success: boolean; inserted: number; totalStandard: number }>("/custom/data-types/bootstrap", {}),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["custom-data-types"] }),
+  });
+}
+
+export function useCustomPages(params?: { search?: string; isActive?: boolean; page?: number; limit?: number }) {
+  const query = new URLSearchParams();
+  if (params?.search) query.set("search", params.search);
+  if (params?.isActive !== undefined) query.set("isActive", String(params.isActive));
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
+  return useQuery<PaginatedResponse<CustomAppPage>>({
+    queryKey: ["custom-pages", params ?? {}],
+    queryFn: () => api.get(`/custom/pages${query.toString() ? `?${query.toString()}` : ""}`),
   });
 }
 

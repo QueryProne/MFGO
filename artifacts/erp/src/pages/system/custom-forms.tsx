@@ -8,11 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
   useAddFieldToFormMutation,
   useAttachCustomFormToEntityMutation,
+  useBootstrapStandardDataTypesMutation,
   useCreateCustomFormSavedSearchMutation,
   useCreateCustomFieldMutation,
   useCreateCustomFormMutation,
@@ -21,6 +23,7 @@ import {
   useCustomDataTypes,
   useCustomFields,
   useCustomForms,
+  useCustomPages,
   useDeleteCustomFormSavedSearchMutation,
   useDeleteCustomFieldMutation,
   useDeleteCustomFormMutation,
@@ -145,6 +148,19 @@ const QUICK_FIELD_TEMPLATES: QuickFieldTemplate[] = [
   },
 ];
 
+const ENTITY_TYPE_OPTIONS = [
+  { value: "page", label: "Page" },
+  { value: "customer", label: "Customer" },
+  { value: "vendor", label: "Vendor" },
+  { value: "item", label: "Item" },
+  { value: "workorder", label: "Work Order" },
+  { value: "production_order", label: "Production Order" },
+  { value: "salesorder", label: "Sales Order" },
+  { value: "purchaseorder", label: "Purchase Order" },
+  { value: "lead", label: "Lead" },
+  { value: "opportunity", label: "Opportunity" },
+];
+
 function parseActiveFormFromLocation(location: string): number | null {
   const query = location.split("?")[1] ?? "";
   const params = new URLSearchParams(query);
@@ -168,9 +184,13 @@ function toEditableValue(value: unknown): string {
 export function CustomFormsAdminContent({ embedded = false }: { embedded?: boolean }) {
   const [location, navigate] = useLocation();
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<"builder" | "saved-searches">("builder");
+  const [didAttemptTypeBootstrap, setDidAttemptTypeBootstrap] = useState(false);
   const { data: dataTypesData } = useCustomDataTypes({ limit: 400 });
   const { data: fieldsData } = useCustomFields({ limit: 500 });
   const { data: formsData } = useCustomForms({ limit: 300 });
+  const { data: pagesData } = useCustomPages({ isActive: true, limit: 300 });
+  const bootstrapDataTypes = useBootstrapStandardDataTypesMutation();
 
   const createField = useCreateCustomFieldMutation();
   const deleteField = useDeleteCustomFieldMutation();
@@ -191,6 +211,7 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
   const dataTypes = dataTypesData?.data ?? [];
   const fields = fieldsData?.data ?? [];
   const forms = formsData?.data ?? [];
+  const pages = pagesData?.data ?? [];
 
   const [fieldName, setFieldName] = useState("");
   const [fieldLabel, setFieldLabel] = useState("");
@@ -244,6 +265,26 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
       setActiveFormId(forms[0].id);
     }
   }, [activeFormId, forms]);
+
+  useEffect(() => {
+    if (dataTypes.length > 0) {
+      if (didAttemptTypeBootstrap) {
+        setDidAttemptTypeBootstrap(false);
+      }
+      return;
+    }
+    if (didAttemptTypeBootstrap || bootstrapDataTypes.isPending) return;
+    setDidAttemptTypeBootstrap(true);
+    bootstrapDataTypes.mutate(undefined, {
+      onError: () => {
+        toast({
+          title: "Unable to load standard data types",
+          description: "Confirm schema is pushed and API is connected to the correct database.",
+          variant: "destructive",
+        });
+      },
+    });
+  }, [bootstrapDataTypes.isPending, bootstrapDataTypes.mutate, dataTypes.length, didAttemptTypeBootstrap, toast]);
 
   const activeForm = useMemo(
     () => forms.find((form) => form.id === activeFormId) ?? null,
@@ -314,6 +355,18 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
     if (!activeFormId) return;
     setAttachFormId(String(activeFormId));
   }, [activeFormId]);
+
+  useEffect(() => {
+    if (attachEntityType !== "page") return;
+    if (pages.length === 0) {
+      if (attachEntityId) setAttachEntityId("");
+      return;
+    }
+    const exists = pages.some((page) => page.pageId === attachEntityId);
+    if (!exists) {
+      setAttachEntityId(pages[0].pageId);
+    }
+  }, [attachEntityId, attachEntityType, pages]);
 
   useEffect(() => {
     if (!formSavedSearches.length) {
@@ -483,7 +536,19 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
         </CardContent>
       </Card>
 
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value === "saved-searches" ? "saved-searches" : "builder")}
+        className="w-full"
+      >
+        <TabsList className="grid w-full max-w-md grid-cols-2 bg-secondary/50 p-1 rounded-lg">
+          <TabsTrigger value="builder">Builder</TabsTrigger>
+          <TabsTrigger value="saved-searches">Saved Searches</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {activeTab === "builder" ? (
         <Card className="border-border/50 shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-display">Custom Fields</CardTitle>
@@ -576,9 +641,23 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
             </div>
 
             {dataTypes.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                No data types available yet. Standard types load from the backend automatically.
-              </p>
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  No data types available yet. Standard types should load automatically from the backend.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  disabled={bootstrapDataTypes.isPending}
+                  onClick={() => {
+                    setDidAttemptTypeBootstrap(true);
+                    bootstrapDataTypes.mutate();
+                  }}
+                >
+                  Reload Standard Data Types
+                </Button>
+              </div>
             ) : null}
 
             <div className="space-y-2 max-h-[280px] overflow-auto pr-1">
@@ -615,7 +694,9 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
             </div>
           </CardContent>
         </Card>
+        ) : null}
 
+        {activeTab === "builder" ? (
         <Card className="border-border/50 shadow-sm xl:col-span-2" id="forms-output">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-display">Reusable Forms</CardTitle>
@@ -708,6 +789,24 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
               ) : (
                 <p className="text-xs text-muted-foreground">Select a form to continue building the raw form layout.</p>
               )}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Field Templates</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  {QUICK_FIELD_TEMPLATES.map((template) => (
+                    <Button
+                      key={`form-template-${template.key}`}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="justify-start text-xs"
+                      disabled={createField.isPending}
+                      onClick={() => createTemplateField(template)}
+                    >
+                      {template.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
                 <Select value={selectedFieldId} onValueChange={setSelectedFieldId}>
                   <SelectTrigger className="bg-background">
@@ -816,7 +915,9 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
             </div>
           </CardContent>
         </Card>
+        ) : null}
 
+        {activeTab === "saved-searches" ? (
         <Card className="border-border/50 shadow-sm xl:col-span-2">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-display">Saved Searches (Form Answers)</CardTitle>
@@ -1004,7 +1105,9 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
             )}
           </CardContent>
         </Card>
+        ) : null}
 
+        {activeTab === "builder" ? (
         <Card className="border-border/50 shadow-sm xl:col-span-2">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-display">Apply Form To Page / Entity</CardTitle>
@@ -1016,25 +1119,54 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
               </p>
             ) : null}
 
-            <div className="grid grid-cols-1 md:grid-cols-[180px_1fr_180px_auto] gap-2">
-              <Input
-                value={attachEntityType}
-                onChange={(event) => setAttachEntityType(event.target.value)}
-                placeholder="Entity type (customer, vendor, workorder...)"
-                className="bg-background"
-              />
-              <Input
-                value={attachEntityId}
-                onChange={(event) => setAttachEntityId(event.target.value)}
-                placeholder="Entity ID"
-                className="bg-background"
-              />
-              <Input
-                value={attachFormId}
-                onChange={(event) => setAttachFormId(event.target.value)}
-                placeholder="Form ID"
-                className="bg-background"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-[200px_1fr_240px_auto] gap-2">
+              <Select value={attachEntityType} onValueChange={setAttachEntityType}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Select entity type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ENTITY_TYPE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {attachEntityType === "page" ? (
+                <Select value={attachEntityId} onValueChange={setAttachEntityId}>
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Select page ID" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pages.map((page) => (
+                      <SelectItem key={page.id} value={page.pageId}>
+                        {page.title} ({page.pageId})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  value={attachEntityId}
+                  onChange={(event) => setAttachEntityId(event.target.value)}
+                  placeholder="Entity ID"
+                  className="bg-background"
+                />
+              )}
+
+              <Select value={attachFormId} onValueChange={setAttachFormId}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Select form" />
+                </SelectTrigger>
+                <SelectContent>
+                  {forms.map((form) => (
+                    <SelectItem key={form.id} value={String(form.id)}>
+                      #{form.id} {form.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button
                 className="gap-2"
                 disabled={!hasAttachTarget || !attachFormId || attachForm.isPending}
@@ -1056,6 +1188,11 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
                 Apply To Page
               </Button>
             </div>
+            {attachEntityType === "page" ? (
+              <p className="text-xs text-muted-foreground">
+                Available page IDs: {pages.length}. Choose a page ID to attach the selected form.
+              </p>
+            ) : null}
 
             {!hasAttachTarget ? (
               <p className="text-sm text-muted-foreground">Enter entity type and entity ID to manage attachments.</p>
@@ -1100,7 +1237,9 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
                         className="flex items-center justify-between rounded-md border border-border/60 bg-background/70 px-3 py-2"
                       >
                         <p className="text-sm">
-                          {application.entityType}:{application.entityId}
+                          {application.entityType === "page"
+                            ? `${application.pageTitle || application.pageId || application.entityId} (${application.pageId || application.entityId})`
+                            : `${application.entityType}:${application.entityId}`}
                         </p>
                         <p className="text-xs text-muted-foreground">Sort {application.sortOrder}</p>
                       </div>
@@ -1111,9 +1250,10 @@ export function CustomFormsAdminContent({ embedded = false }: { embedded?: boole
             ) : null}
           </CardContent>
         </Card>
+        ) : null}
       </div>
 
-      {hasAttachTarget ? (
+      {activeTab === "builder" && hasAttachTarget ? (
         <CustomFormsPanel
           entityType={attachEntityType}
           entityId={attachEntityId}

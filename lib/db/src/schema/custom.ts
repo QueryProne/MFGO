@@ -102,12 +102,33 @@ export const customFormFieldsTable = pgTable(
   }),
 );
 
+export const appPagesTable = pgTable(
+  "app_pages",
+  {
+    id: serial("id").primaryKey(),
+    pageId: varchar("page_id", { length: 120 }).notNull(),
+    title: varchar("title", { length: 180 }).notNull(),
+    route: varchar("route", { length: 200 }).notNull(),
+    description: text("description"),
+    isActive: boolean("is_active").notNull().default(true),
+    settings: jsonb("settings").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    pageIdUnique: uniqueIndex("uq_app_pages_page_id").on(table.pageId),
+    routeUnique: uniqueIndex("uq_app_pages_route").on(table.route),
+    activeIdx: index("idx_app_pages_is_active").on(table.isActive),
+  }),
+);
+
 export const pageCustomFormsTable = pgTable(
   "page_custom_forms",
   {
     id: serial("id").primaryKey(),
     entityType: varchar("entity_type", { length: 100 }).notNull().default("page"),
     entityId: varchar("page_id", { length: 200 }).notNull(),
+    appPageId: integer("app_page_id").references(() => appPagesTable.id, { onDelete: "set null" }),
     formId: integer("form_id")
       .notNull()
       .references(() => customFormsTable.id, { onDelete: "cascade" }),
@@ -119,6 +140,7 @@ export const pageCustomFormsTable = pgTable(
   (table) => ({
     entityFormUnique: uniqueIndex("uq_page_custom_forms_entity_form").on(table.entityType, table.entityId, table.formId),
     entitySortIdx: index("idx_page_custom_forms_entity_sort").on(table.entityType, table.entityId, table.sortOrder),
+    appPageIdx: index("idx_page_custom_forms_app_page_id").on(table.appPageId),
     formIdx: index("idx_page_custom_forms_form_id").on(table.formId),
   }),
 );
@@ -187,6 +209,10 @@ export const customFormsRelations = relations(customFormsTable, ({ many }) => ({
   savedSearches: many(customSavedSearchesTable),
 }));
 
+export const appPagesRelations = relations(appPagesTable, ({ many }) => ({
+  formLinks: many(pageCustomFormsTable),
+}));
+
 export const customFormFieldsRelations = relations(customFormFieldsTable, ({ one }) => ({
   form: one(customFormsTable, {
     fields: [customFormFieldsTable.formId],
@@ -202,6 +228,10 @@ export const pageCustomFormsRelations = relations(pageCustomFormsTable, ({ one }
   form: one(customFormsTable, {
     fields: [pageCustomFormsTable.formId],
     references: [customFormsTable.id],
+  }),
+  appPage: one(appPagesTable, {
+    fields: [pageCustomFormsTable.appPageId],
+    references: [appPagesTable.id],
   }),
 }));
 
@@ -223,6 +253,7 @@ export type DataType = typeof dataTypesTable.$inferSelect;
 export type CustomField = typeof customFieldsTable.$inferSelect;
 export type CustomForm = typeof customFormsTable.$inferSelect;
 export type CustomFormField = typeof customFormFieldsTable.$inferSelect;
+export type AppPage = typeof appPagesTable.$inferSelect;
 export type PageCustomForm = typeof pageCustomFormsTable.$inferSelect;
 export type CustomFieldValue = typeof customFieldValuesTable.$inferSelect;
 export type CustomSavedSearch = typeof customSavedSearchesTable.$inferSelect;

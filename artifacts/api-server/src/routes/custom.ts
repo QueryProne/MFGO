@@ -2,6 +2,7 @@ import { Router } from "express";
 import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 
 import {
+  appPagesTable,
   customFieldValuesTable,
   customFieldsTable,
   customFormFieldsTable,
@@ -66,6 +67,25 @@ const STANDARD_DATA_TYPES: Array<{
   { name: "JSON", slug: "json", description: "Structured JSON object/array payload." },
 ];
 
+const STANDARD_APP_PAGES: Array<{
+  pageId: string;
+  title: string;
+  route: string;
+  description: string;
+  settings?: JsonObject;
+}> = [
+  { pageId: "dashboard", title: "Dashboard", route: "/", description: "Manufacturing command center." },
+  { pageId: "customers", title: "Customers", route: "/customers", description: "Customer master and CRM details." },
+  { pageId: "vendors", title: "Vendors", route: "/vendors", description: "Vendor master and supplier profile." },
+  { pageId: "items", title: "Item Master", route: "/items", description: "Engineering and item master records." },
+  { pageId: "workorders", title: "Work Orders", route: "/workorders", description: "Production work order execution." },
+  { pageId: "purchaseorders", title: "Purchase Orders", route: "/purchaseorders", description: "Purchasing operations." },
+  { pageId: "salesorders", title: "Sales Orders", route: "/salesorders", description: "Sales order operations." },
+  { pageId: "leads", title: "Leads", route: "/leads", description: "Lead qualification pipeline." },
+  { pageId: "opportunities", title: "Opportunities", route: "/opportunities", description: "Opportunity pipeline and forecasting." },
+  { pageId: "administration", title: "Administration", route: "/admin", description: "System administration and setup." },
+];
+
 async function bootstrapStandardDataTypes() {
   const slugs = STANDARD_DATA_TYPES.map((item) => item.slug);
   const existing = await db
@@ -95,6 +115,36 @@ async function bootstrapStandardDataTypes() {
   return { inserted: toInsert.length, totalStandard: STANDARD_DATA_TYPES.length };
 }
 
+async function bootstrapStandardAppPages() {
+  const ids = STANDARD_APP_PAGES.map((item) => item.pageId);
+  const existing = await db
+    .select({ pageId: appPagesTable.pageId })
+    .from(appPagesTable)
+    .where(inArray(appPagesTable.pageId, ids));
+
+  const existingIds = new Set(existing.map((row) => row.pageId));
+  const toInsert = STANDARD_APP_PAGES.filter((item) => !existingIds.has(item.pageId));
+  if (!toInsert.length) {
+    return { inserted: 0, totalStandard: STANDARD_APP_PAGES.length };
+  }
+
+  await db
+    .insert(appPagesTable)
+    .values(
+      toInsert.map((item) => ({
+        pageId: item.pageId,
+        title: item.title,
+        route: item.route,
+        description: item.description,
+        settings: item.settings ?? {},
+        isActive: true,
+      })),
+    )
+    .onConflictDoNothing({ target: appPagesTable.pageId });
+
+  return { inserted: toInsert.length, totalStandard: STANDARD_APP_PAGES.length };
+}
+
 router.get("/custom/data-types", async (req, res) => {
   try {
     await bootstrapStandardDataTypes();
@@ -119,6 +169,43 @@ router.get("/custom/data-types", async (req, res) => {
 router.post("/custom/data-types/bootstrap", async (_req, res) => {
   try {
     const result = await bootstrapStandardDataTypes();
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(500).json({ error: "error", message: String(error) });
+  }
+});
+
+router.get("/custom/pages", async (req, res) => {
+  try {
+    await bootstrapStandardAppPages();
+    const { page, limit, offset } = parsePagination(req.query as Record<string, unknown>, { limit: 200 });
+    const search = asString(req.query.search);
+    const isActive = asBoolean(req.query.isActive);
+    const whereParts = [];
+    if (search) {
+      whereParts.push(
+        or(ilike(appPagesTable.pageId, `%${search}%`), ilike(appPagesTable.title, `%${search}%`), ilike(appPagesTable.route, `%${search}%`)),
+      );
+    }
+    if (isActive !== null) {
+      whereParts.push(eq(appPagesTable.isActive, isActive));
+    }
+    const whereClause = whereParts.length > 0 ? and(...whereParts) : undefined;
+
+    const [data, countRows] = await Promise.all([
+      db.select().from(appPagesTable).where(whereClause).orderBy(asc(appPagesTable.title)).limit(limit).offset(offset),
+      db.select({ count: sql<number>`count(*)` }).from(appPagesTable).where(whereClause),
+    ]);
+    const total = Number(countRows[0]?.count ?? 0);
+    res.json({ data, meta: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) } });
+  } catch (error) {
+    res.status(500).json({ error: "error", message: String(error) });
+  }
+});
+
+router.post("/custom/pages/bootstrap", async (_req, res) => {
+  try {
+    const result = await bootstrapStandardAppPages();
     res.json({ success: true, ...result });
   } catch (error) {
     res.status(500).json({ error: "error", message: String(error) });
@@ -527,10 +614,15 @@ router.get("/custom/forms/:id", async (req, res) => {
           linkId: pageCustomFormsTable.id,
           entityType: pageCustomFormsTable.entityType,
           entityId: pageCustomFormsTable.entityId,
+          appPageId: pageCustomFormsTable.appPageId,
+          pageId: appPagesTable.pageId,
+          pageTitle: appPagesTable.title,
+          pageRoute: appPagesTable.route,
           sortOrder: pageCustomFormsTable.sortOrder,
           settings: pageCustomFormsTable.settings,
         })
         .from(pageCustomFormsTable)
+        .leftJoin(appPagesTable, eq(pageCustomFormsTable.appPageId, appPagesTable.id))
         .where(eq(pageCustomFormsTable.formId, formId))
         .orderBy(asc(pageCustomFormsTable.entityType), asc(pageCustomFormsTable.entityId), asc(pageCustomFormsTable.sortOrder)),
     ]);
@@ -905,12 +997,17 @@ router.get("/custom/entities/:entityType/:entityId/forms", async (req, res) => {
       .select({
         linkId: pageCustomFormsTable.id,
         formId: pageCustomFormsTable.formId,
+        appPageId: pageCustomFormsTable.appPageId,
+        pageId: appPagesTable.pageId,
+        pageTitle: appPagesTable.title,
+        pageRoute: appPagesTable.route,
         sortOrder: pageCustomFormsTable.sortOrder,
         settings: pageCustomFormsTable.settings,
         formName: customFormsTable.name,
         formSlug: customFormsTable.slug,
       })
       .from(pageCustomFormsTable)
+      .leftJoin(appPagesTable, eq(pageCustomFormsTable.appPageId, appPagesTable.id))
       .leftJoin(customFormsTable, eq(pageCustomFormsTable.formId, customFormsTable.id))
       .where(and(eq(pageCustomFormsTable.entityType, entityType), eq(pageCustomFormsTable.entityId, entityId)))
       .orderBy(asc(pageCustomFormsTable.sortOrder));
@@ -997,6 +1094,7 @@ router.get("/custom/entities/:entityType/:entityId/forms", async (req, res) => {
 router.post("/custom/entities/:entityType/:entityId/forms", async (req, res) => {
   try {
     const entityType = String(req.params.entityType);
+    const normalizedEntityType = entityType.trim().toLowerCase();
     const entityId = String(req.params.entityId);
     const payload = req.body as { formId: number; sortOrder?: number; settings?: JsonObject };
     const formId = Number(payload.formId);
@@ -1006,18 +1104,33 @@ router.post("/custom/entities/:entityType/:entityId/forms", async (req, res) => 
       return;
     }
 
+    let appPageId: number | null = null;
+    if (normalizedEntityType === "page") {
+      await bootstrapStandardAppPages();
+      const [page] = await db.select().from(appPagesTable).where(eq(appPagesTable.pageId, entityId)).limit(1);
+      if (!page) {
+        res.status(400).json({
+          error: "bad_request",
+          message: `Unknown page ID "${entityId}". Use GET /api/custom/pages for valid page IDs.`,
+        });
+        return;
+      }
+      appPageId = page.id;
+    }
+
     const [saved] = await db
       .insert(pageCustomFormsTable)
       .values({
         entityType,
         entityId,
+        appPageId,
         formId,
         sortOrder: payload.sortOrder ?? 0,
         settings: asObject(payload.settings),
       })
       .onConflictDoUpdate({
         target: [pageCustomFormsTable.entityType, pageCustomFormsTable.entityId, pageCustomFormsTable.formId],
-        set: { sortOrder: payload.sortOrder ?? 0, settings: asObject(payload.settings), updatedAt: new Date() },
+        set: { sortOrder: payload.sortOrder ?? 0, appPageId, settings: asObject(payload.settings), updatedAt: new Date() },
       })
       .returning();
     res.status(201).json(saved);

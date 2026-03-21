@@ -457,6 +457,10 @@ export interface CustomFormApplication {
   linkId: number;
   entityType: string;
   entityId: string;
+  appPageId?: number | null;
+  pageId?: string | null;
+  pageTitle?: string | null;
+  pageRoute?: string | null;
   sortOrder: number;
   settings?: Record<string, unknown>;
 }
@@ -469,11 +473,27 @@ export interface CustomFormDetailResponse {
 export interface EntityCustomFormLink {
   linkId: number;
   formId: number;
+  appPageId?: number | null;
+  pageId?: string | null;
+  pageTitle?: string | null;
+  pageRoute?: string | null;
   sortOrder: number;
   settings?: Record<string, unknown>;
   formName?: string;
   formSlug?: string;
   fields?: CustomFormFieldView[];
+}
+
+export interface CustomAppPage {
+  id: number;
+  pageId: string;
+  title: string;
+  route: string;
+  description?: string | null;
+  isActive: boolean;
+  settings?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CustomValueRow {
