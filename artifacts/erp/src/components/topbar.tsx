@@ -1,13 +1,34 @@
-import { Bell, Settings } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Bell, FilePlus2, Settings } from "lucide-react";
+import { useLocation } from "wouter";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTheme } from "./theme-provider";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "./ui/dropdown-menu";
 import { UniversalSearch } from "@/components/search/universal-search";
+import { resolvePageIdFromLocation } from "@/lib/page-registry";
+import { useEntityCustomForms } from "@/hooks/use-shared-workflows";
+import { CustomFormsPanel } from "@/components/custom/custom-forms-panel";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 export function Topbar() {
+  const [location] = useLocation();
   const { theme, setTheme } = useTheme();
+  const [formDialogOpen, setFormDialogOpen] = useState(false);
+
+  const pageRoute = useMemo(() => resolvePageIdFromLocation(location), [location]);
+  const currentPageId = pageRoute?.pageId ?? "";
+  const { data: attachedPageFormsData } = useEntityCustomForms("page", currentPageId, false);
+  const attachedPageForms = attachedPageFormsData?.data ?? [];
+  const hasPageFormAttached = Boolean(currentPageId) && attachedPageForms.length > 0;
 
   return (
     <header className="h-14 flex items-center justify-between px-4 border-b border-border/50 bg-background/80 backdrop-blur-md sticky top-0 z-50">
@@ -17,6 +38,32 @@ export function Topbar() {
       </div>
 
       <div className="flex items-center gap-3">
+        {hasPageFormAttached ? (
+          <Dialog open={formDialogOpen} onOpenChange={setFormDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="secondary" size="sm" className="h-8 gap-2 text-xs">
+                <FilePlus2 className="w-3.5 h-3.5" />
+                Create Form
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl w-[92vw] max-h-[88vh] overflow-auto">
+              <DialogHeader>
+                <DialogTitle className="text-base font-display">
+                  {pageRoute?.title || "Page"} Form Entry
+                </DialogTitle>
+                <DialogDescription>
+                  Fill out forms attached to page ID <span className="font-mono">{currentPageId}</span>.
+                </DialogDescription>
+              </DialogHeader>
+              <CustomFormsPanel
+                entityType="page"
+                entityId={currentPageId}
+                title={`Forms for ${pageRoute?.title || currentPageId}`}
+              />
+            </DialogContent>
+          </Dialog>
+        ) : null}
+
         <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground relative group">
           <Bell className="w-4 h-4" />
           <span className="absolute top-2 right-2 w-2 h-2 bg-destructive rounded-full border-2 border-background group-hover:border-secondary"></span>
